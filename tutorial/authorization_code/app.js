@@ -66,8 +66,6 @@ app.get('/login', function(req, res) {
 
 app.get('/playlists', function(req, res) {
 
-    console.log("access token: ", access_token);
-
     var options = {
       url: 'https://api.spotify.com/v1/me/playlists',
       headers: { 'Authorization': 'Bearer ' + access_token },
@@ -76,16 +74,19 @@ app.get('/playlists', function(req, res) {
 
     // use the access token to access the Spotify Web API
     request.get(options, function(error, response, body) {
+
+      let playlists = [];
+
       for(let playlist of body.items)
       {
-          console.log(playlist.name);
+          playlists.push(playlist.name);
       }
+
+      res.send(querystring.stringify(playlists));
+
     });
 
-    res.redirect('/#' +
-      querystring.stringify({
-        access_token: access_token
-    }));
+
 });
 
 app.get('/callback', function(req, res) {
@@ -213,3 +214,4 @@ app.get('/refresh_token', function(req, res) {
 
 console.log('Listening on 8888');
 app.listen(8888);
+//process.env.PORT || 8888
