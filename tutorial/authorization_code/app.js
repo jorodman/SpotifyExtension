@@ -17,6 +17,8 @@ var client_id = '68829692b36742b68cf3163a55138448'; // Your client id
 var client_secret = '761fc3a6e9054badb680d682b5dcd354'; // Your secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
 
+var access_token;
+
 /**
  * Generates a random string containing numbers and letters
  * @param  {number} length The length of the string
@@ -62,6 +64,30 @@ app.get('/login', function(req, res) {
     }));
 });
 
+app.get('/playlists', function(req, res) {
+
+    console.log("access token: ", access_token);
+
+    var options = {
+      url: 'https://api.spotify.com/v1/me/playlists',
+      headers: { 'Authorization': 'Bearer ' + access_token },
+      json: true
+    };
+
+    // use the access token to access the Spotify Web API
+    request.get(options, function(error, response, body) {
+      for(let playlist of body.items)
+      {
+          console.log(playlist.name);
+      }
+    });
+
+    res.redirect('/#' +
+      querystring.stringify({
+        access_token: access_token
+    }));
+});
+
 app.get('/callback', function(req, res) {
   console.log("callback");
 
@@ -95,7 +121,7 @@ app.get('/callback', function(req, res) {
     request.post(authOptions, function(error, response, body) {
       if (!error && response.statusCode === 200) {
 
-        var access_token = body.access_token,
+        access_token = body.access_token,
             refresh_token = body.refresh_token;
 
         var options = {
@@ -123,10 +149,6 @@ app.get('/callback', function(req, res) {
 
           for(let playlist of body.items)
           {
-            res.redirect('/playlist' +
-              querystring.stringify({
-                playlist_name: playlist.name
-              }));
 
               //console.log(playlist.name);
               //console.log(playlist);
