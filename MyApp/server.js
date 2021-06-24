@@ -30,6 +30,7 @@ app.use(express.static(__dirname + '/public'))
    .use(cors())
    .use(cookieParser()).listen(8888);
 
+
 app.get('/test', function(req, res) {
   res.setHeader('Content-Type', 'application/json');
   res.send({ data: 'user created in db' });
@@ -42,7 +43,7 @@ app.get('/login', function(req, res) {
   res.cookie(stateKey, state);
 
   // your application requests authorization
-  var scope = 'user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private';
+  var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
   res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
       response_type: 'code',
@@ -144,11 +145,7 @@ app.get('/callback', function(req, res)
             /************************/
 
             // we can also pass the token to the browser to make requests from there
-            res.redirect('/#' +
-              querystring.stringify({
-                access_token: access_token,
-                refresh_token: refresh_token
-              }));
+            res.redirect('/friends.html?access_token=' + access_token);
        }
        else
        {

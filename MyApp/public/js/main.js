@@ -4,14 +4,13 @@ import
   User
 } from "./user.js";
 
-var user;
-
 window.onload = async function()
 {
-    var params = getHashParams();
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
 
-    var access_token = params.access_token;
-    var error = params.error;
+    const access_token = urlParams.get('access_token');
+    const error = urlParams.get('error');
 
     if (error)
     {
@@ -21,23 +20,26 @@ window.onload = async function()
     {
         if (access_token)
         {
-            user = new User(access_token);
-
             let options =
             {
                 url: 'https://api.spotify.com/v1/me',
-                headers: { 'Authorization': 'Bearer ' + user.access_token },
+                headers: { 'Authorization': 'Bearer ' + access_token },
                 json: true
             };
 
             let myResp = await fetch('https://api.spotify.com/v1/me', options);
             let userdata = await myResp.json();
 
-            user.display_name = userdata.display_name;
-            user.id = userdata.id;
-            user.country = userdata.country;
-            user.email = userdata.email;
+            sessionStorage['access_token'] = access_token;
+            sessionStorage['display_name'] = userdata.display_name;
+            sessionStorage['id'] = userdata.id;
 
+            showLoggedInMenuIcons();
+            updateWithUserData();
+        }
+        else if(sessionStorage['access_token'])
+        {
+            showLoggedInMenuIcons();
             updateWithUserData();
         }
         else
@@ -49,25 +51,169 @@ window.onload = async function()
 
 function updateWithUserData()
 {
-    document.getElementById("login").classList.add("d-none");
-    document.getElementById("loggedIn").classList.remove("d-none");
-    document.getElementById("loggedIn").classList.add("d-block");
+    if(window.location.pathname == '/' || window.location.pathname.includes("index.html"))
+    {
+        document.getElementById("login").classList.add("d-none");
+        document.getElementById("loggedIn").classList.remove("d-none");
+        document.getElementById("loggedIn").classList.add("d-block");
 
-    let playlistButton = document.getElementById("generatePlaylist");
-    playlistButton.addEventListener("click", generatePlaylistHack);
+        let playlistButton = document.getElementById("generatePlaylist");
+        playlistButton.addEventListener("click", generatePlaylistHack);
 
-    let msg = document.getElementById("welcomeMessage");
-    msg.innerText = "Welcome to spotify connect, " + user.display_name + "! Let's start my generating a playlist for you based off of songs that you have been listening to on repeat";
+        let msg = document.getElementById("welcomeMessage");
+        msg.innerText = "Welcome to spotify connect, " + sessionStorage['display_name'] + "!";
+    }
 }
 
-function generatePlaylistHack()
+function showLoggedInMenuIcons()
 {
-    generatePlaylist();
+    let links = document.getElementById("navbar").getElementsByTagName("li");
+
+    for(let link of links)
+    {
+        link.classList.remove('d-none');
+    }
 }
 
-async function generatePlaylist()
+async function getAllSavedTracks()
 {
-  console.log('generate playlist called');
+    let maxTracks = 50;
+    let tracks = [];
+    let offset = 0;
+    let previousNumTracks;
+
+    let options = {
+      method: "GET",
+      headers: {
+        'Authorization': 'Bearer ' + user.access_token
+      }
+    };
+
+    // Takes roughly 4 seconds for 1300 songs
+    do
+    {
+        let res = await fetch('https://api.spotify.com/v1/me/tracks?limit=50&offset=' + offset, options);
+        let data = await res.json();
+
+        previousNumTracks = data.items.length;
+        offset += previousNumTracks;
+
+        for(let song of data.items)
+        {
+            tracks.push(song.track);
+        }
+    }
+    while (previousNumTracks == maxTracks)
+
+    return tracks;
+}
+
+function getMutualTracks(list1, list2)
+{
+    let mutual = [];
+
+    for(let track of list1)
+    {
+        // TODO use ID for contains function
+        if(list2.contains(track))
+        {
+            mutual.push(track);
+        }
+    }
+
+    return mutual;
+}
+
+function getCleanTracks(tracks)
+{
+    let clean = [];
+
+    for(let track of tracks)
+    {
+        // TODO use ID for contains function
+        if(!track.explicit)
+        {
+            clean.push(track);
+        }
+    }
+
+    return clean;
+}
+
+async function generatePlaylistHack()
+{
+    let tracks = await getAllSavedTracks();
+
+    let clean = await getCleanTracks(tracks);
+
+    let cleanPlaylist = await generatePlaylist("My Clean Liked Songs", " ");
+
+    let result = await addTracksToPlaylist(cleanPlaylist.id, clean);
+}
+
+async function addTracksToPlaylist(playlistID, tracks)
+{
+    let uris = [];
+
+    for(let track of tracks)
+    {
+        uris.push(track.uri);
+    }
+
+    // TODO clean up this design
+    let startIndex = 0;
+    let tracksLeft = uris.length;
+
+    while(tracksLeft < 0)
+    {
+        let tempTracks = [];
+
+        if(uris.length < 100)
+        {
+            tempTracks = uris;
+            tracksLeft = 0;
+        }
+        else
+        {
+            tempTracks = uris.splice(startIndex, 100);
+        }
+
+        let options = {
+          method: "POST",
+          headers: {
+            'Authorization': 'Bearer ' + user.access_token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            uris: tempTracks
+          })
+        };
+
+        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
+        let data = await res.json();
+
+        startIndex += 100;
+        tracksLeft = uris.length;
+    }
+}
+
+async function getTopTracks()
+{
+  let options = {
+    method: "GET",
+    headers: {
+      'Authorization': 'Bearer ' + user.access_token
+    }
+  };
+
+  let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=medium_term&limit=50', options);
+  let data = await res.json();
+
+  return data.items;
+}
+
+async function generatePlaylist(name, description)
+{
 
   let options = {
     method: "POST",
@@ -76,26 +222,14 @@ async function generatePlaylist()
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      name: "New Playlist",
-      description: "New playlist description",
+      name: name,
+      description: description,
       public: false
     })
   };
 
   let res = await fetch('https://api.spotify.com/v1/users/' + user.id + '/playlists', options);
   let data = await res.json();
-  
-  console.log(data);
-}
 
-
-function getHashParams()
-{
-  var hashParams = {};
-  var e, r = /([^&;=]+)=?([^&;]*)/g,
-      q = window.location.hash.substring(1);
-  while ( e = r.exec(q)) {
-     hashParams[e[1]] = decodeURIComponent(e[2]);
-  }
-  return hashParams;
+  return data;
 }
