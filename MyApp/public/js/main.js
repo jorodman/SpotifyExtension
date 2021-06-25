@@ -1,8 +1,4 @@
 
-import
-{
-  User
-} from "./user.js";
 
 window.onload = async function()
 {
@@ -62,7 +58,29 @@ function updateWithUserData()
 
         let msg = document.getElementById("welcomeMessage");
         msg.innerText = "Welcome to spotify connect, " + sessionStorage['display_name'] + "!";
+
+        addEventListeners();
+        initialRequest();
     }
+}
+
+function addEventListeners()
+{
+    let fourWeeks = document.getElementById("ArtistsFourWeeks");
+    let sixMonths = document.getElementById("ArtistsSixMonths");
+    let allTime = document.getElementById("ArtistsAllTime");
+
+    fourWeeks.addEventListener("click", queryHack.bind("short_term"));
+    sixMonths.addEventListener("click", queryHack.bind("medium_term"));
+    allTime.addEventListener("click", queryHack.bind("long_term"));
+
+    let fourWeeksSongs = document.getElementById("SongsFourWeeks");
+    let sixMonthsSongs = document.getElementById("SongsSixMonths");
+    let allTimeSongs = document.getElementById("SongsAllTime");
+
+    fourWeeksSongs.addEventListener("click", queryHackSongs.bind("short_term"));
+    sixMonthsSongs.addEventListener("click", queryHackSongs.bind("medium_term"));
+    allTimeSongs.addEventListener("click", queryHackSongs.bind("long_term"));
 }
 
 function showLoggedInMenuIcons()
@@ -75,6 +93,106 @@ function showLoggedInMenuIcons()
     }
 }
 
+function queryHack()
+{
+    changeTopArtists(this);
+}
+
+function queryHackSongs()
+{
+    changeTopSongs(this);
+}
+
+async function changeTopArtists(timePeriod)
+{
+    let artists = await getTopArtists(timePeriod);
+    populateWithArtists(artists);
+}
+
+async function changeTopSongs(timePeriod)
+{
+    let tracks = await getTopTracks(timePeriod);
+    populateWithTracks(tracks);
+}
+
+async function initialRequest()
+{
+    let tracks = await getTopTracks("short_term");
+    populateWithTracks(tracks);
+
+    let artists = await getTopArtists("short_term");
+    populateWithArtists(artists);
+}
+
+async function populateWithTracks(tracks)
+{
+    let list = document.getElementById("tracklist");
+    list.innerHTML = '';
+
+    for(let track of tracks)
+    {
+        let element = document.createElement("li");
+        element.classList.add('list-group-item');
+        element.innerText = track.name;
+        list.appendChild(element);
+    }
+}
+
+async function populateWithArtists(artists)
+{
+    let list = document.getElementById("artistList");
+    list.innerHTML = '';
+
+    for(let artist of artists)
+    {
+        let element = document.createElement("li");
+        element.classList.add('list-group-item');
+        element.innerText = artist.name;
+        list.appendChild(element);
+    }
+}
+
+async function getUniqueTracks(tracks)
+{
+    let uniqueTracks = [];
+
+    let options = {
+      method: "GET",
+      headers: {
+        'Authorization': 'Bearer ' + sessionStorage['access_token']
+      }
+    };
+
+    for(let track of tracks)
+    {
+        if(track.popularity < 40)
+        {
+            let url = 'https://api.spotify.com/v1/artists?ids=';
+
+            for(let artist of track.artists)
+            {
+                url += artist.id + ',';
+            }
+
+            url = url.substring(0, url.length - 1);
+
+            let response = await fetch(url, options);
+            let data = await response.json();
+
+            for(let artist of data.artists)
+            {
+                if(artist.popularity < 40)
+                {
+                    uniqueTracks.push(track);
+                    break;
+                }
+            }
+        }
+    }
+
+    return uniqueTracks;
+}
+
 async function getAllSavedTracks()
 {
     let maxTracks = 50;
@@ -85,7 +203,7 @@ async function getAllSavedTracks()
     let options = {
       method: "GET",
       headers: {
-        'Authorization': 'Bearer ' + user.access_token
+        'Authorization': 'Bearer ' + sessionStorage['access_token']
       }
     };
 
@@ -144,11 +262,13 @@ async function generatePlaylistHack()
 {
     let tracks = await getAllSavedTracks();
 
-    let clean = await getCleanTracks(tracks);
+    populateWithTracks(tracks);
 
-    let cleanPlaylist = await generatePlaylist("My Clean Liked Songs", " ");
-
-    let result = await addTracksToPlaylist(cleanPlaylist.id, clean);
+    // let clean = await getCleanTracks(tracks);
+    //
+    // let cleanPlaylist = await generatePlaylist("My Clean Liked Songs", " ");
+    //
+    // let result = await addTracksToPlaylist(cleanPlaylist.id, clean);
 }
 
 async function addTracksToPlaylist(playlistID, tracks)
@@ -181,7 +301,7 @@ async function addTracksToPlaylist(playlistID, tracks)
         let options = {
           method: "POST",
           headers: {
-            'Authorization': 'Bearer ' + user.access_token,
+            'Authorization': 'Bearer ' + sessionStorage['access_token'],
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -197,16 +317,32 @@ async function addTracksToPlaylist(playlistID, tracks)
     }
 }
 
-async function getTopTracks()
+async function getTopArtists(timePeriod)
 {
   let options = {
     method: "GET",
     headers: {
-      'Authorization': 'Bearer ' + user.access_token
+      'Authorization': 'Bearer ' + sessionStorage['access_token']
     }
   };
 
-  let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=medium_term&limit=50', options);
+  let res = await fetch('https://api.spotify.com/v1/me/top/artists?time_range=' + timePeriod + '&limit=10', options);
+  let data = await res.json();
+
+  return data.items;
+}
+
+
+async function getTopTracks(timePeriod)
+{
+  let options = {
+    method: "GET",
+    headers: {
+      'Authorization': 'Bearer ' + sessionStorage['access_token']
+    }
+  };
+
+  let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=50', options);
   let data = await res.json();
 
   return data.items;
@@ -218,7 +354,7 @@ async function generatePlaylist(name, description)
   let options = {
     method: "POST",
     headers: {
-      'Authorization': 'Bearer ' + user.access_token,
+      'Authorization': 'Bearer ' + sessionStorage['access_token'],
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -228,7 +364,7 @@ async function generatePlaylist(name, description)
     })
   };
 
-  let res = await fetch('https://api.spotify.com/v1/users/' + user.id + '/playlists', options);
+  let res = await fetch('https://api.spotify.com/v1/users/' + sessionStorage['id'] + '/playlists', options);
   let data = await res.json();
 
   return data;
