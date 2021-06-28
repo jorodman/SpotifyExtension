@@ -54,6 +54,44 @@ app.get('/login', function(req, res) {
     }));
 });
 
+app.get('/friends', function(req, res) {
+
+    console.log("/friends");
+
+    let friends = [];
+
+    let users = [
+        
+    ]; // Get the users from the database
+
+    for(let user of users)
+    {
+        break;
+
+        var options = {
+          url: 'https://api.spotify.com/v1/me/following/contains?type=user&ids=' + user.username,
+          headers: { 'Authorization': 'Bearer ' + access_token },
+          json: true
+        };
+
+        request.get(options, function(error, response, body) {
+            if(body[0].true)
+            {
+                friends.push(user);
+            }
+        });
+    }
+
+
+
+    res.setHeader('Content-Type', 'application/json');
+    res.send({
+        friends: friends
+    });
+
+});
+
+
 app.get('/callback', function(req, res)
 {
   console.log('/callback');

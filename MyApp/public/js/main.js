@@ -45,7 +45,7 @@ window.onload = async function()
     }
 }
 
-function updateWithUserData()
+async function updateWithUserData()
 {
     if(window.location.pathname == '/' || window.location.pathname.includes("index.html"))
     {
@@ -61,6 +61,27 @@ function updateWithUserData()
 
         addEventListeners();
         initialRequest();
+    }
+    else if(window.location.pathname == '/friends.html')
+    {
+        let options = {
+          method: "GET"
+        };
+
+        let response = await fetch("/friends", options);
+        let json = await response.json();
+
+
+        let list = document.getElementById("friendList");
+
+        for(let friend of json.friends)
+        {
+            let element = document.createElement("li");
+            element.classList.add('list-group-item');
+            element.innerText = friend.name;
+            list.appendChild(element);
+        }
+
     }
 }
 
