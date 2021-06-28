@@ -122,9 +122,34 @@ async function initialRequest()
 
     let artists = await getTopArtists("short_term");
     populateWithArtists(artists);
+
+    let library = await getAllSavedTracks();
+
+    let sorted = sortSongsByPopularity(library);
+
+    let threshhold = 40;
+
+    let noPopularArtists = await removeSongsByPopularArtists(sorted.slice(0,100), threshhold);
+
+    // TODO handle libraries of less than five songs
+    pupolateWithUniqueSongs(noPopularArtists.slice(0,5));
 }
 
-async function populateWithTracks(tracks)
+function pupolateWithUniqueSongs(tracks)
+{
+    let list = document.getElementById("uniqueSongs");
+    list.innerHTML = '';
+
+    for(let track of tracks)
+    {
+        let element = document.createElement("li");
+        element.classList.add('list-group-item');
+        element.innerText = track.name;
+        list.appendChild(element);
+    }
+}
+
+function populateWithTracks(tracks)
 {
     let list = document.getElementById("tracklist");
     list.innerHTML = '';
@@ -138,7 +163,7 @@ async function populateWithTracks(tracks)
     }
 }
 
-async function populateWithArtists(artists)
+function populateWithArtists(artists)
 {
     let list = document.getElementById("artistList");
     list.innerHTML = '';
@@ -150,6 +175,63 @@ async function populateWithArtists(artists)
         element.innerText = artist.name;
         list.appendChild(element);
     }
+}
+
+async function removeSongsByPopularArtists(tracks, threshhold)
+{
+    let uniqueTracks = [];
+
+    let options = {
+      method: "GET",
+      headers: {
+        'Authorization': 'Bearer ' + sessionStorage['access_token']
+      }
+    };
+
+    for(let track of tracks)
+    {
+        let url = 'https://api.spotify.com/v1/artists?ids=';
+
+        for(let artist of track.artists)
+        {
+            url += artist.id + ',';
+        }
+
+        url = url.substring(0, url.length - 1);
+
+        let response = await fetch(url, options);
+        let data = await response.json();
+
+        for(let artist of data.artists)
+        {
+            if(artist.popularity < threshhold)
+            {
+                uniqueTracks.push(track);
+                break;
+            }
+        }
+    }
+
+    return uniqueTracks;
+}
+
+function sortSongsByPopularity(tracks)
+{
+    return tracks.sort(sortByPopularity);
+}
+
+function sortByPopularity(trackA, trackB)
+{
+    if (trackA.popularity < trackB.popularity)
+    {
+        return -1;
+    }
+    else if (trackA.popularity > trackB.popularity)
+    {
+       return 1;
+    }
+
+    return 0;
 }
 
 async function getUniqueTracks(tracks)
