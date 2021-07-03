@@ -64,6 +64,8 @@ async function updateWithUserData()
     }
     else if(window.location.pathname == '/friends.html')
     {
+        document.getElementById("mutualPlaylistButton").addEventListener("click", generateMutualPlaylist);
+
         let options = {
           method: "GET"
         };
@@ -71,18 +73,47 @@ async function updateWithUserData()
         let response = await fetch("/friends", options);
         let json = await response.json();
 
-
         let list = document.getElementById("friendList");
 
-        for(let friend of json.friends)
+        for(let friend of json)
         {
             let element = document.createElement("li");
             element.classList.add('list-group-item');
+            element.classList.add('friend-list-item');
             element.innerText = friend.name;
+            element.addEventListener("click", onClickSelectFriend.bind(element));
             list.appendChild(element);
         }
-
     }
+}
+
+async function generateMutualPlaylist()
+{
+    let element = document.querySelectorAll(".friend-list-item.active");
+
+    if(element && element[0])
+    {
+        let username = element[0].innerText;
+
+        let options = {
+          method: "GET"
+        };
+
+        let response = await fetch("/mutualPlaylist?username=" + username, options);
+        console.log(response);
+    }
+}
+
+function onClickSelectFriend()
+{
+    let list = document.querySelectorAll(".friend-list-item");
+
+    for(let friend of list)
+    {
+        friend.classList.remove("active");
+    }
+
+    this.classList.add("active");
 }
 
 function addEventListeners()
