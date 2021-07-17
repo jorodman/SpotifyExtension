@@ -55,8 +55,6 @@ app.get('/login', function(req, res) {
 
 app.get('/friends', async function(req, res) {
 
-    console.log("/friends");
-
     let friends = [];
 
     let users = await connection.query('Select * from users');
@@ -80,16 +78,6 @@ app.get('/friends', async function(req, res) {
 
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(friends));
-});
-
-
-app.get("/mutualPlaylist", function(req, res)
-{
-    let parsedURL = url.parse(req.url, true);
-    let username = parsedURL.query.username;
-
-    res.writeHead(200, {"Access-Control-Allow-Origin": "*"});
-    res.end('ok');
 });
 
 
@@ -163,6 +151,22 @@ app.get('/callback', async function(req, res)
     }
 });
 
+app.get('/access_token', function(req, res) {
+  res.setHeader('Content-Type', 'application/json');
+  res.send({ access_token: access_token });
+});
+
+app.get("/mutualPlaylist", function(req, res)
+{
+    let parsedURL = url.parse(req.url, true);
+    let friendUsername = parsedURL.query.username;
+
+    let success = await generateMutualPlaylist(friendUsername);
+
+    res.writeHead(200, {"Access-Control-Allow-Origin": "*"});
+    res.end('ok');
+});
+
 app.get('/refresh_token', function(req, res) {
 
   // requesting access token from refresh token
@@ -187,11 +191,6 @@ app.get('/refresh_token', function(req, res) {
   });
 });
 
-app.get('/access_token', function(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.send({ access_token: access_token });
-});
-
 
 var generateRandomString = function(length) {
     var text = '';
@@ -202,3 +201,164 @@ var generateRandomString = function(length) {
     }
     return text;
 };
+
+async function generateMutualPlaylist(friendUsername)
+{
+    let playlist = await generatePlaylist("Mutual Playlist", "", friendUsername, access_token);
+
+    let friendAccessToken = await connection.query('Select access_token, refresh_token from users where name = ' + friendUsername);
+
+    let u1Short = await getTopTracks("short_term", access_token);
+    let u1Medium = await getTopTracks("medium_term", access_token);
+    let u1Long = await getTopTracks("long_term", access_token);
+
+    let u1Songs = u1Short.concat(u1Medium).concat(u1Long);
+
+    let u1SongIDs = [];
+
+    for(let song of u1Songs)
+    {
+        u1SongIDs.push(song.id);
+    }
+
+    let u2Short = await getTopTracks("short_term", friendAccessToken);
+    let u2Medium = await getTopTracks("medium_term", friendAccessToken);
+    let u2Long = await getTopTracks("long_term", friendAccessToken);
+
+    let u2Songs = u2Short.concat(u2Medium).concat(u2Long);
+
+    let u2SongIDs = [];
+
+    for(let song of u2Songs)
+    {
+        u2SongIDs.push(song.id);
+    }
+
+    let mutualSongIDs = [];
+
+    for(let song of u1SongIDs)
+    {
+        if(u2SongIDs.includes(song.id))
+        {
+            mutualSongIDs.push(song.id);
+        }
+    }
+
+    if(mutualSongIDs.length >= 20)
+    {
+        // return mutualSongIDs;
+    }
+
+    console.log("Length after top songs: " + mutualSongIDs.length);
+
+    let u1SavedTracks = await getAllSavedTracks(access_token);
+
+    let u1SavedTrackIDs = [];
+
+    for(let song of u1SavedTracks)
+    {
+        u1SavedTrackIDs.push(song.id);
+    }
+
+    let u2SavedTracks = await getAllSavedTracks(friendAccessToken);
+
+    let u2SavedTrackIDs = [];
+
+    for(let song of u2SavedTracks)
+    {
+        u2SavedTrackIDs.push(song.id);
+    }
+
+    for(let song of u2SavedTrackIDs)
+    {
+        if(u1SavedTrackIDs.includes(song.id))
+        {
+            mutualSongIDs.push(song.id);
+        }
+    }
+
+    console.log("Length after liked songs: " + mutualSongIDs.length);
+    // Make sure multiple genres accounted for?
+
+    if(mutualSongIDs.length >= 20)
+    {
+        // return mutualSongIDs;
+    }
+
+
+    // get top genres from both of them, and then filter their top songs by genres
+    // Then filter their liked songs by genre
+
+}
+
+// TODO add a number of songs param
+async function getTopTracks(timePeriod, access_token_param)
+{
+    let options = {
+        method: "GET",
+        headers: {
+          'Authorization': 'Bearer ' + access_token_param
+        }
+    };
+
+    let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=50', options);
+    let data = await res.json();
+
+    return data.items;
+}
+
+async function getAllSavedTracks(access_token_param)
+{
+    let maxTracks = 50;
+    let tracks = [];
+    let offset = 0;
+    let previousNumTracks;
+
+    let options = {
+      method: "GET",
+      headers: {
+        'Authorization': 'Bearer ' + access_token_param
+      }
+    };
+
+    // Takes roughly 4 seconds for 1300 songs
+    do
+    {
+        let res = await fetch('https://api.spotify.com/v1/me/tracks?limit=50&offset=' + offset, options);
+        let data = await res.json();
+
+        previousNumTracks = data.items.length;
+        offset += previousNumTracks;
+
+        for(let song of data.items)
+        {
+            tracks.push(song.track);
+        }
+    }
+    while (previousNumTracks == maxTracks)
+
+    return tracks;
+}
+
+
+async function generatePlaylist(name, description, userID, access_token_param)
+{
+
+  let options = {
+    method: "POST",
+    headers: {
+      'Authorization': 'Bearer ' + access_token_param,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: name,
+      description: description,
+      public: false
+    })
+  };
+
+  let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
+  let data = await res.json();
+
+  return data;
+}
