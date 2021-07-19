@@ -25,14 +25,12 @@ async function setupDatabaseConnection()
     }
     finally
     {
-        console.log("complete");
+
     }
 }
 
 async function updateAllPlaylists()
 {
-    console.log("update");
-
     let users = await connection.query("Select * from users");
 
     for(let user of users)
@@ -41,31 +39,39 @@ async function updateAllPlaylists()
 
         if(user.fourWeekPlaylist)
         {
-            let playlistID = await connection.query("Select * from playlists where userName = \'" + user.name + "\' and type = 'fourWeeks'");
+            let playlistIDs = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = 'fourWeekPlaylist'");
 
-            if(playlistID)
+            if(playlistIDs[0])
             {
-                let tracks = await getTopTracks("short_term", access_token, 100);
-                let success = await replaceAllSongsInPlaylist(playlistID, access_token, tracks);
+                let tracks = await getTopTracks("short_term", access_token, 200);
+                let success = await replaceAllSongsInPlaylist(playlistIDs[0].id, access_token, tracks);
             }
         }
 
         if(user.sixMonthPlaylist)
         {
-            let playlistID = await connection.query("Select * from playlists where userID = " + user.name + "and type = fourWeeks");
-            let tracks = await getTopTracks("medium_term", access_token, 100);
-            let success = await replaceAllSongsInPlaylist(playlistID, access_token, tracks);
+            let playlistIDs = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'sixMonthPlaylist\'");
+
+            if(playlistIDs[0])
+            {
+                let tracks = await getTopTracks("medium_term", access_token, 200);
+                let success = await replaceAllSongsInPlaylist(playlistIDs[0].id, access_token, tracks);
+            }
         }
 
         if(user.allTimePlaylist)
         {
-            let playlist = await connection.query("Select * from playlists where userID = " + user.name + "and type = fourWeeks");
-            let tracks = await getTopTracks("long_term", access_token, 100);
-            let success = await replaceAllSongsInPlaylist(playlistID, access_token, tracks);
+            let playlistIDs = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'allTimePlaylist\'");
+
+            if(playlistIDs[0])
+            {
+                let tracks = await getTopTracks("long_term", access_token, 200);
+                let success = await replaceAllSongsInPlaylist(playlistIDs[0].id, access_token, tracks);
+            }
         }
     }
 
-    setTimeout(() => { updateAllPlaylists() }, 1000);
+    //setTimeout(() => { updateAllPlaylists() }, 1000);
 }
 
 async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
@@ -83,14 +89,16 @@ async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
           'Authorization': 'Bearer ' + access_token_param,
           'Content-Type': 'application/json'
         },
-        body: {
-            uris: uris
-        }
+        body: JSON.stringify({
+            'uris': uris
+        })
     };
 
     let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
 
-    return res.statusCode;
+    console.log(res.status);
+
+    return res.status;
 }
 
 
@@ -141,6 +149,7 @@ async function getAccessToken(refresh_token_param)
 // What would happen if you request 80 songs not 100?
 async function getTopTracks(timePeriod, access_token_param, numTracks)
 {
+    console.log("num tracks: " + numTracks);
     let options = {
         method: "GET",
         headers: {
@@ -150,17 +159,21 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
 
     let topUserTracks = [];
     let tracksRecieved = 0;
+    let increment = 50;
     let limit = 50;
 
     while(tracksRecieved < numTracks)
     {
-        let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=' + limit + '&offset=' + tracksRecieved, options);
+        let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=' + limit + '&offset=' + 0, options);
         let data = await res.json();
 
-        tracksRecieved += limit;
+        tracksRecieved += increment;
+        limit += increment;
 
         topUserTracks = topUserTracks.concat(data.items);
     }
+
+    console.log("Total songs: " + topUserTracks.length);
 
     return topUserTracks;
 }
