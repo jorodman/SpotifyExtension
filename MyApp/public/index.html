@@ -1,96 +1,232 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
-<title>Spotify Connect</title>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-<link rel="stylesheet" href="css/style.css"/>
-<script type="module" src="js/main.js"></script>
+  <title>Spotify Playlists</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
 
+  <!-- Favicons -->
+  <link href="assets/img/favicon.png" rel="icon">
+  <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,500,500i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="assets/vendor/glightbox/css/glightbox.min.css" rel="stylesheet">
+  <link href="assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="assets/vendor/swiper/swiper-bundle.min.css" rel="stylesheet">
+
+  <!-- main js -->
+  <script type="module" src="js/main.js"></script>
+
+  <!-- Template Main CSS File -->
+  <link href="assets/css/style.css" rel="stylesheet">
+
+  <!-- =======================================================
+  * Template Name: KnightOne - v4.3.0
+  * Template URL: https://bootstrapmade.com/knight-simple-one-page-bootstrap-template/
+  * Author: BootstrapMade.com
+  * License: https://bootstrapmade.com/license/
+  ======================================================== -->
 </head>
 
 <body>
 
-    <div class="container">
-      <nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <a class="navbar-brand" href="index.html">
-    <img src="https://www.freepnglogos.com/uploads/spotify-logo-png/file-spotify-logo-png-4.png" width="30" height="30" alt="file spotify logo png" class="d-inline-block align-top"/>
-    Spotify Connect
-  </a>
+  <!-- ======= Header ======= -->
+  <header id="header" class="fixed-top ">
+    <div class="container-fluid">
 
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
+      <div class="row justify-content-center">
+        <div class="col-xl-9 d-flex align-items-center justify-content-lg-between">
+          <h1 class="logo me-auto me-lg-0"><a href="index.html">Spotify Playlists</a></h1>
+          <!-- Uncomment below if you prefer to use an image logo -->
+          <!-- <a href="index.html" class="logo me-auto me-lg-0"><img src="assets/img/logo.png" alt="" class="img-fluid"></a>-->
 
-  <div class="collapse navbar-collapse" id="navbarSupportedContent">
-    <ul class="navbar-nav mr-auto" id="navbar">
-      <li class="nav-item active">
-        <a class="nav-link" href="index.html">Home<span class="sr-only">(current)</span></a>
-      </li>
-      <li class="nav-item d-none">
-        <a class="nav-link" href="friends.html">Friends</a>
-      </li>
-    </ul>
-    <form class="form-inline my-2 my-lg-0 d-none">
-      <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
-      <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
-    </form>
-  </div>
-</nav>
+          <nav id="navbar" class="navbar order-last order-lg-0">
+            <ul>
+              <li><a class="nav-link scrollto active" href="#hero">Home</a></li>
+              <li class="loggedIn"><a class="nav-link scrollto d-none logged-in" href="#services">Playlists</a></li>
+              <li><a class="nav-link scrollto" href="#about">About</a></li>
+              <!-- <li><a class="nav-link scrollto " href="#portfolio">Portfolio</a></li>
+              <li><a class="nav-link scrollto" href="#pricing">Pricing</a></li>
+              <li class="dropdown"><a href="#"><span>Drop Down</span> <i class="bi bi-chevron-down"></i></a>
+                <ul>
+                  <li><a href="#">Drop Down 1</a></li>
+                  <li class="dropdown"><a href="#"><span>Deep Drop Down</span> <i class="bi bi-chevron-right"></i></a>
+                    <ul>
+                      <li><a href="#">Deep Drop Down 1</a></li>
+                      <li><a href="#">Deep Drop Down 2</a></li>
+                      <li><a href="#">Deep Drop Down 3</a></li>
+                      <li><a href="#">Deep Drop Down 4</a></li>
+                      <li><a href="#">Deep Drop Down 5</a></li>
+                    </ul>
+                  </li>
+                  <li><a href="#">Drop Down 2</a></li>
+                  <li><a href="#">Drop Down 3</a></li>
+                  <li><a href="#">Drop Down 4</a></li>
+                </ul>
+              </li>
+              <li><a class="nav-link scrollto" href="#contact">Contact</a></li> -->
+            </ul>
+            <i class="bi bi-list mobile-nav-toggle"></i>
+          </nav><!-- .navbar -->
 
-
-      <div class = "jumbotron">
-        <h1 id="welcomeHeader">Welcome To Spotify Connect</h1>
-
-        <div id="login">
-          <p>Log in with spotify to learn more about your taste in music</p>
-          <a class="btn btn-success btn-lg" id="loginButton" href="/login">Login With Spotify</a>
         </div>
-
-        <div id="loggedIn" class="d-none">
-          <p id="welcomeMessage"></p>
-          <p></p>
-          <a class="btn btn-success btn-lg" id="generatePlaylist" href="#">Click</a>
-        </div>
-      </div>
-
-      <div class = "jumbotron">
-        <h1>Top Artists</h1>
-        <div class="btn-group" role="group" aria-label="Basic example">
-          <button type="button" class="btn btn-secondary" id="ArtistsFourWeeks">Last 4 Weeks</button>
-          <button type="button" class="btn btn-secondary" id="ArtistsSixMonths">Last 6 Months</button>
-          <button type="button" class="btn btn-secondary" id="ArtistsAllTime">All Time</button>
-        </div>
-        <ul class="list-group" id="artistList">
-
-        </ul>
-      </div>
-
-      <div class = "jumbotron">
-        <h1>Top Songs</h1>
-        <a class="btn btn-success btn-lg" href="#">Generate Playlist</a>
-        <div class="btn-group" role="group" aria-label="Basic example">
-          <button type="button" class="btn btn-secondary" id="SongsFourWeeks">Last 4 Weeks</button>
-          <button type="button" class="btn btn-secondary" id="SongsSixMonths">Last 6 Months</button>
-          <button type="button" class="btn btn-secondary" id="SongsAllTime">All Time</button>
-        </div>
-        <ul class="list-group" id="tracklist">
-
-        </ul>
-      </div>
-
-      <div class = "jumbotron">
-        <h1>Most Unique Songs In Your Library</h1>
-        <div class="btn-group" role="group" aria-label="Basic example">
-        </div>
-        <ul class="list-group" id="uniqueSongs">
-
-        </ul>
       </div>
 
     </div>
+  </header><!-- End Header -->
+
+  <!-- ======= Hero Section ======= -->
+  <section id="hero" class="d-flex flex-column justify-content-center">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-xl-8">
+          <h1>Spotify Playlists</h1>
+          <h2>A tool that creates and automatically updates playlists based off of your top songs</h2>
+          <a href="/login" class="get-started-btn scrollto logged-out">Login with Spotify</a>
+
+          <!-- <a href="https://www.youtube.com/watch?v=jDDaplaOz7Q" class="glightbox play-btn mb-4"></a> -->
+        </div>
+      </div>
+    </div>
+  </section><!-- End Hero -->
+
+  <main id="main">
+
+
+
+    <!-- ======= Services Section ======= -->
+    <section id="services" class="services d-none logged-in">
+      <div class="container">
+
+        <div class="section-title">
+          <h2>Your Playlists</h2>
+          <p>View and change what playlists you have chosen to subscribe to</p>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch">
+            <div class="icon-box">
+              <div class="icon"><i class="bx bxl-dribbble"></i></div>
+              <h4><a href="">Four Week Roundup</a></h4>
+              <p>Your top songs from the past four weeks. Updated daily</p>
+              <br>
+              <button id="generateFourWeek" type="button" class="btn btn-success">Generate</button>
+            </div>
+          </div>
+
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch mt-4 mt-md-0">
+            <div class="icon-box">
+              <div class="icon"><i class="bx bx-file"></i></div>
+              <h4><a href="">Six Month Summary</a></h4>
+              <p>Your top songs from the past six months. Updated daily</p>
+              <br>
+              <button id="generateSixMonth" type="button" class="btn btn-success">Generate</button>
+            </div>
+          </div>
+
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch mt-4 mt-lg-0">
+            <div class="icon-box">
+              <div class="icon"><i class="bx bx-tachometer"></i></div>
+              <h4><a href="">All Time Favorites</a></h4>
+              <p>Your top songs of all time. Updated daily</p>
+              <br>
+              <button id="generateAllTime" type="button" class="btn btn-success">Generate</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+    <!-- ======= About Us Section ======= -->
+    <section id="about" class="about">
+      <div class="container">
+
+        <div class="section-title">
+          <h2>About</h2>
+          <!-- <p></p> -->
+        </div>
+
+        <div class="row content">
+          <div class="col-lg-12">
+            <p>
+                I love Spotify's custom "On Repeat" and "Repeat Rewind" playlists, but I wanted them to be longer and I wanted playlists representing my listening habits from a longer period of time. So I developed a
+                this tool that automatically creates playlists based off of a user's top songs from different time periods. It updates the playlists automatically and keeps them at 100 songs each.
+            </p>
+            <!-- <ul>
+              <li><i class="ri-check-double-line"></i> Ullamco laboris nisi ut aliquip ex ea commodo consequat</li>
+              <li><i class="ri-check-double-line"></i> Duis aute irure dolor in reprehenderit in voluptate velit</li>
+              <li><i class="ri-check-double-line"></i> Ullamco laboris nisi ut aliquip ex ea commodo consequat</li>
+            </ul> -->
+            <a href="/login" class="btn-learn-more logged-out">Login with Spotify</a>
+
+          </div>
+          <!-- <div class="col-lg-6 pt-4 pt-lg-0">
+            <p>
+              Ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate
+              velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+              culpa qui officia deserunt mollit anim id est laborum.
+            </p>
+            <a href="#" class="btn-learn-more">Login with Spotify</a>
+          </div> -->
+        </div>
+
+      </div>
+    </section><!-- End About Us Section -->
+<!--
+
+
+  </main><!-- End #main -->
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer">
+    <div class="container">
+      <h3>Spotify Playlists</h3>
+      <!-- <p>Et aut eum quis fuga eos sunt ipsa nihil. Labore corporis magni eligendi fuga maxime saepe commodi placeat.</p> -->
+      <!-- <div class="social-links">
+        <a href="#" class="twitter"><i class="bx bxl-twitter"></i></a>
+        <a href="#" class="facebook"><i class="bx bxl-facebook"></i></a>
+        <a href="#" class="instagram"><i class="bx bxl-instagram"></i></a>
+        <a href="#" class="google-plus"><i class="bx bxl-skype"></i></a>
+        <a href="#" class="linkedin"><i class="bx bxl-linkedin"></i></a>
+      </div> -->
+      <div class="copyright">
+        &copy; Copyright <strong><span>Joseph Rodman</span></strong>. All Rights Reserved
+      </div>
+      <div class="credits">
+        <!-- All the links in the footer should remain intact. -->
+        <!-- You can delete the links only if you purchased the pro version. -->
+        <!-- Licensing information: https://bootstrapmade.com/license/ -->
+        <!-- Purchase the pro version with working PHP/AJAX contact form: https://bootstrapmade.com/knight-simple-one-page-bootstrap-template/ -->
+        Webpage designed by <a target="_blank" href="https://bootstrapmade.com/">BootstrapMade</a>
+      </div>
+    </div>
+  </footer><!-- End Footer -->
+
+  <div id="preloader"></div>
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Vendor JS Files -->
+  <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+  <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
+  <script src="assets/vendor/php-email-form/validate.js"></script>
+  <script src="assets/vendor/purecounter/purecounter.js"></script>
+  <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+
+  <!-- Template Main JS File -->
+  <script src="assets/js/main.js"></script>
 
 </body>
+
 </html>

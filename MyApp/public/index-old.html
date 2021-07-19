@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<title>Spotify Playlists</title>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<link rel="stylesheet" href="css/style.css"/>
+<script type="module" src="js/main.js"></script>
+
+</head>
+
+<body>
+
+    <div class="container">
+      <nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="index.html">
+    <img src="https://www.freepnglogos.com/uploads/spotify-logo-png/file-spotify-logo-png-4.png" width="30" height="30" alt="file spotify logo png" class="d-inline-block align-top"/>
+    Spotify Playlists
+  </a>
+
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <!-- <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto" id="navbar">
+      <li class="nav-item active">
+        <a class="nav-link" href="index.html">Home<span class="sr-only">(current)</span></a>
+      </li>
+    </ul>
+  </div> -->
+</nav>
+
+
+      <div class = "jumbotron">
+        <h1 id="welcomeHeader">This is Spotify Playlists.</h1>
+
+        <div id="login">
+          <!-- <p>Log in with spotify</p> -->
+          <a class="btn btn-success btn-lg" id="loginButton" href="/login">Login With Spotify</a>
+        </div>
+
+        <div id="loggedIn" class="d-none">
+          <p id="welcomeMessage"></p>
+          <p></p>
+          <a class="btn btn-success btn-lg" id="generatePlaylist" href="#">Click</a>
+        </div>
+
+      </div>
+
+      <!-- <div class = "jumbotron">
+        <h1>Top Artists</h1>
+        <div class="btn-group" role="group" aria-label="Basic example">
+          <button type="button" class="btn btn-secondary" id="ArtistsFourWeeks">Last 4 Weeks</button>
+          <button type="button" class="btn btn-secondary" id="ArtistsSixMonths">Last 6 Months</button>
+          <button type="button" class="btn btn-secondary" id="ArtistsAllTime">All Time</button>
+        </div>
+        <ul class="list-group" id="artistList">
+
+        </ul>
+      </div>
+
+      <div class = "jumbotron">
+        <h1>Top Songs</h1>
+        <a class="btn btn-success btn-lg" href="#">Generate Playlist</a>
+        <div class="btn-group" role="group" aria-label="Basic example">
+          <button type="button" class="btn btn-secondary" id="SongsFourWeeks">Last 4 Weeks</button>
+          <button type="button" class="btn btn-secondary" id="SongsSixMonths">Last 6 Months</button>
+          <button type="button" class="btn btn-secondary" id="SongsAllTime">All Time</button>
+        </div>
+        <ul class="list-group" id="tracklist">
+
+        </ul>
+      </div>
+
+      <div class = "jumbotron">
+        <h1>Most Unique Songs In Your Library</h1>
+        <div class="btn-group" role="group" aria-label="Basic example">
+        </div>
+        <ul class="list-group" id="uniqueSongs">
+
+        </ul>
+      </div> -->
+
+    </div>
+
+</body>
+</html>

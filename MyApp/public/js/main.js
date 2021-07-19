@@ -1,11 +1,13 @@
 
-
 window.onload = async function()
 {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
 
     const access_token = urlParams.get('access_token');
+    const fourWeeks = urlParams.get("fourWeekPlaylist");
+    const sixMonths = urlParams.get("sixMonthPlaylist");
+    const allTime = urlParams.get("allTimePlaylist");
     const error = urlParams.get('error');
 
     if (error)
@@ -27,16 +29,17 @@ window.onload = async function()
             let userdata = await myResp.json();
 
             sessionStorage['access_token'] = access_token;
-            sessionStorage['display_name'] = userdata.display_name;
+            // sessionStorage['display_name'] = userdata.display_name;
             sessionStorage['id'] = userdata.id;
+            sessionStorage['fourWeekPlaylist'] = fourWeeks;
+            sessionStorage['sixMonthPlaylist'] = sixMonths;
+            sessionStorage['allTimePlaylist'] = allTime;
 
-            showLoggedInMenuIcons();
-            updateWithUserData();
+            login();
         }
         else if(sessionStorage['access_token'])
         {
-            showLoggedInMenuIcons();
-            updateWithUserData();
+            login();
         }
         else
         {
@@ -45,461 +48,155 @@ window.onload = async function()
     }
 }
 
-async function updateWithUserData()
+function login()
 {
-    if(window.location.pathname == '/' || window.location.pathname.includes("index.html"))
+    let itemsToShow = document.querySelectorAll(".logged-in");
+
+    for(let item of itemsToShow)
     {
-        document.getElementById("login").classList.add("d-none");
-        document.getElementById("loggedIn").classList.remove("d-none");
-        document.getElementById("loggedIn").classList.add("d-block");
-
-        let playlistButton = document.getElementById("generatePlaylist");
-        playlistButton.addEventListener("click", generatePlaylistHack);
-
-        let msg = document.getElementById("welcomeMessage");
-        msg.innerText = "Welcome to spotify connect, " + sessionStorage['display_name'] + "!";
-
-        addEventListeners();
-        initialRequest();
+        item.classList.remove("d-none");
     }
-    else if(window.location.pathname == '/friends.html')
+
+    let itemsToHide = document.querySelectorAll(".logged-out");
+
+    for(let item of itemsToHide)
     {
-        document.getElementById("mutualPlaylistButton").addEventListener("click", generateMutualPlaylist);
-
-        let options = {
-          method: "GET"
-        };
-
-        let response = await fetch("/friends", options);
-        let json = await response.json();
-
-        let list = document.getElementById("friendList");
-
-        for(let friend of json)
-        {
-            let element = document.createElement("li");
-            element.classList.add('list-group-item');
-            element.classList.add('friend-list-item');
-            element.innerText = friend.name;
-            element.addEventListener("click", onClickSelectFriend.bind(element));
-            list.appendChild(element);
-        }
+        item.classList.add("d-none");
     }
+
+    //************* ADD EVENT LISTENERS TO PLAYLIST GENERATE BUTTONS *************//
+
+    let fourWeekButton = document.getElementById("generateFourWeek");
+    fourWeekButton.addEventListener("click", generatePlaylistHack.bind(this, "fourWeekPlaylist", fourWeekButton));
+
+    if(sessionStorage['fourWeekPlaylist'] === "1")
+    {
+        fourWeekButton.innerText = "Delete";
+    }
+
+    let sixMonthButton = document.getElementById("generateSixMonth");
+    sixMonthButton.addEventListener("click", generatePlaylistHack.bind(this, "sixMonthPlaylist", sixMonthButton));
+
+    if(sessionStorage['sixMonthPlaylist'] === "1")
+    {
+        sixMonthButton.innerText = "Delete";
+    }
+
+    let allTimeButton = document.getElementById("generateAllTime");
+    allTimeButton.addEventListener("click", generatePlaylistHack.bind(this, "allTimePlaylist", allTimeButton));
+
+    if(sessionStorage['allTimePlaylist'] === "1")
+    {
+        allTimeButton.innerText = "Delete";
+    }
+
 }
 
-async function generateMutualPlaylist()
+function generatePlaylistHack(timePeriod, button)
 {
-    let element = document.querySelectorAll(".friend-list-item.active");
-
-    if(element && element[0])
+    if(button.innerText === "Generate")
     {
-        let username = element[0].innerText;
-
-        let options = {
-          method: "GET"
-        };
-
-        let response = await fetch("/mutualPlaylist?username=" + username, options);
-        console.log(response);
+        generatePlaylist(timePeriod);
+    }
+    else
+    {
+        deletePlaylist(timePeriod);
     }
 }
 
-function onClickSelectFriend()
+async function generatePlaylist(timePeriod)
 {
-    let list = document.querySelectorAll(".friend-list-item");
-
-    for(let friend of list)
-    {
-        friend.classList.remove("active");
-    }
-
-    this.classList.add("active");
-}
-
-function addEventListeners()
-{
-    let fourWeeks = document.getElementById("ArtistsFourWeeks");
-    let sixMonths = document.getElementById("ArtistsSixMonths");
-    let allTime = document.getElementById("ArtistsAllTime");
-
-    fourWeeks.addEventListener("click", queryHack.bind("short_term"));
-    sixMonths.addEventListener("click", queryHack.bind("medium_term"));
-    allTime.addEventListener("click", queryHack.bind("long_term"));
-
-    let fourWeeksSongs = document.getElementById("SongsFourWeeks");
-    let sixMonthsSongs = document.getElementById("SongsSixMonths");
-    let allTimeSongs = document.getElementById("SongsAllTime");
-
-    fourWeeksSongs.addEventListener("click", queryHackSongs.bind("short_term"));
-    sixMonthsSongs.addEventListener("click", queryHackSongs.bind("medium_term"));
-    allTimeSongs.addEventListener("click", queryHackSongs.bind("long_term"));
-}
-
-function showLoggedInMenuIcons()
-{
-    let links = document.getElementById("navbar").getElementsByTagName("li");
-
-    for(let link of links)
-    {
-        link.classList.remove('d-none');
-    }
-}
-
-function queryHack()
-{
-    changeTopArtists(this);
-}
-
-function queryHackSongs()
-{
-    changeTopSongs(this);
-}
-
-async function changeTopArtists(timePeriod)
-{
-    let artists = await getTopArtists(timePeriod);
-    populateWithArtists(artists);
-}
-
-async function changeTopSongs(timePeriod)
-{
-    let tracks = await getTopTracks(timePeriod);
-    populateWithTracks(tracks);
-}
-
-async function initialRequest()
-{
-    let tracks = await getTopTracks("short_term");
-    populateWithTracks(tracks);
-
-    let artists = await getTopArtists("short_term");
-    populateWithArtists(artists);
-
-    let library = await getAllSavedTracks();
-
-    let sorted = sortSongsByPopularity(library);
-
-    let threshhold = 40;
-
-    let noPopularArtists = await removeSongsByPopularArtists(sorted.slice(0,100), threshhold);
-
-    // TODO handle libraries of less than five songs
-    pupolateWithUniqueSongs(noPopularArtists.slice(0,5));
-}
-
-function pupolateWithUniqueSongs(tracks)
-{
-    let list = document.getElementById("uniqueSongs");
-    list.innerHTML = '';
-
-    for(let track of tracks)
-    {
-        let element = document.createElement("li");
-        element.classList.add('list-group-item');
-        element.innerText = track.name;
-        list.appendChild(element);
-    }
-}
-
-function populateWithTracks(tracks)
-{
-    let list = document.getElementById("tracklist");
-    list.innerHTML = '';
-
-    for(let track of tracks)
-    {
-        let element = document.createElement("li");
-        element.classList.add('list-group-item');
-        element.innerText = track.name;
-        list.appendChild(element);
-    }
-}
-
-function populateWithArtists(artists)
-{
-    let list = document.getElementById("artistList");
-    list.innerHTML = '';
-
-    for(let artist of artists)
-    {
-        let element = document.createElement("li");
-        element.classList.add('list-group-item');
-        element.innerText = artist.name;
-        list.appendChild(element);
-    }
-}
-
-async function removeSongsByPopularArtists(tracks, threshhold)
-{
-    let uniqueTracks = [];
-
     let options = {
-      method: "GET",
-      headers: {
-        'Authorization': 'Bearer ' + sessionStorage['access_token']
-      }
+        method: "GET"
     };
 
-    for(let track of tracks)
+    try
     {
-        let url = 'https://api.spotify.com/v1/artists?ids=';
+        let res = await fetch('/generatePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
 
-        for(let artist of track.artists)
-        {
-            url += artist.id + ',';
-        }
-
-        url = url.substring(0, url.length - 1);
-
-        let response = await fetch(url, options);
-        let data = await response.json();
-
-        for(let artist of data.artists)
-        {
-            if(artist.popularity < threshhold)
-            {
-                uniqueTracks.push(track);
-                break;
-            }
-        }
+        updatePlaylistButtonText(timePeriod, "Delete");
     }
-
-    return uniqueTracks;
+    catch(error)
+    {
+        alert(error);
+    }
 }
 
-function sortSongsByPopularity(tracks)
+async function deletePlaylist(timePeriod)
 {
-    return tracks.sort(sortByPopularity);
-}
-
-function sortByPopularity(trackA, trackB)
-{
-    if (trackA.popularity < trackB.popularity)
-    {
-        return -1;
-    }
-    else if (trackA.popularity > trackB.popularity)
-    {
-       return 1;
-    }
-
-    return 0;
-}
-
-async function getUniqueTracks(tracks)
-{
-    let uniqueTracks = [];
-
     let options = {
-      method: "GET",
-      headers: {
-        'Authorization': 'Bearer ' + sessionStorage['access_token']
-      }
+        method: "GET"
     };
 
-    for(let track of tracks)
+    try
     {
-        if(track.popularity < 40)
+        let res = await fetch('/deletePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
+
+        if(res.status === 200)
         {
-            let url = 'https://api.spotify.com/v1/artists?ids=';
-
-            for(let artist of track.artists)
-            {
-                url += artist.id + ',';
-            }
-
-            url = url.substring(0, url.length - 1);
-
-            let response = await fetch(url, options);
-            let data = await response.json();
-
-            for(let artist of data.artists)
-            {
-                if(artist.popularity < 40)
-                {
-                    uniqueTracks.push(track);
-                    break;
-                }
-            }
+            updatePlaylistButtonText(timePeriod, "Generate");
         }
     }
-
-    return uniqueTracks;
-}
-
-async function getAllSavedTracks()
-{
-    let maxTracks = 50;
-    let tracks = [];
-    let offset = 0;
-    let previousNumTracks;
-
-    let options = {
-      method: "GET",
-      headers: {
-        'Authorization': 'Bearer ' + sessionStorage['access_token']
-      }
-    };
-
-    // Takes roughly 4 seconds for 1300 songs
-    do
+    catch(error)
     {
-        let res = await fetch('https://api.spotify.com/v1/me/tracks?limit=50&offset=' + offset, options);
-        let data = await res.json();
-
-        previousNumTracks = data.items.length;
-        offset += previousNumTracks;
-
-        for(let song of data.items)
-        {
-            tracks.push(song.track);
-        }
+        alert(error);
     }
-    while (previousNumTracks == maxTracks)
-
-    return tracks;
 }
 
-function getMutualTracks(list1, list2)
+function updatePlaylistButtonText(type, text)
 {
-    let mutual = [];
-
-    for(let track of list1)
+    if(type === "fourWeekPlaylist")
     {
-        // TODO use ID for contains function
-        if(list2.contains(track))
-        {
-            mutual.push(track);
-        }
+        let fourWeekButton = document.getElementById("generateFourWeek");
+        fourWeekButton.innerText = text;
     }
-
-    return mutual;
-}
-
-function getCleanTracks(tracks)
-{
-    let clean = [];
-
-    for(let track of tracks)
+    else if(type === "sixMonthPlaylist")
     {
-        // TODO use ID for contains function
-        if(!track.explicit)
-        {
-            clean.push(track);
-        }
+        let sixMonthButton = document.getElementById("generateSixMonth");
+        sixMonthButton.innerText = text;
     }
-
-    return clean;
-}
-
-async function generatePlaylistHack()
-{
-    let tracks = await getAllSavedTracks();
-
-    populateWithTracks(tracks);
-
-    // let clean = await getCleanTracks(tracks);
-    //
-    // let cleanPlaylist = await generatePlaylist("My Clean Liked Songs", " ");
-    //
-    // let result = await addTracksToPlaylist(cleanPlaylist.id, clean);
-}
-
-async function addTracksToPlaylist(playlistID, tracks)
-{
-    let uris = [];
-
-    for(let track of tracks)
+    else if(type === "allTimePlaylist")
     {
-        uris.push(track.uri);
+        let allTimeButton = document.getElementById("generateAllTime");
+        allTimeButton.innerText = text;
     }
+}
 
-    // TODO clean up this design
-    let startIndex = 0;
-    let tracksLeft = uris.length;
+function logout()
+{
+    let itemsToShow = document.querySelectorAll(".logged-out");
 
-    while(tracksLeft < 0)
+    for(let item of itemsToShow)
     {
-        let tempTracks = [];
+        item.classList.remove("d-none");
+    }
 
-        if(uris.length < 100)
-        {
-            tempTracks = uris;
-            tracksLeft = 0;
-        }
-        else
-        {
-            tempTracks = uris.splice(startIndex, 100);
-        }
+    let itemsToHide = document.querySelectorAll(".logged-in");
 
-        let options = {
-          method: "POST",
-          headers: {
-            'Authorization': 'Bearer ' + sessionStorage['access_token'],
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            uris: tempTracks
-          })
-        };
-
-        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
-        let data = await res.json();
-
-        startIndex += 100;
-        tracksLeft = uris.length;
+    for(let item of itemsToHide)
+    {
+        item.classList.add("d-none");
     }
 }
 
-async function getTopArtists(timePeriod)
-{
-  let options = {
-    method: "GET",
-    headers: {
-      'Authorization': 'Bearer ' + sessionStorage['access_token']
-    }
-  };
-
-  let res = await fetch('https://api.spotify.com/v1/me/top/artists?time_range=' + timePeriod + '&limit=10', options);
-  let data = await res.json();
-
-  return data.items;
-}
-
-
-async function getTopTracks(timePeriod)
-{
-  let options = {
-    method: "GET",
-    headers: {
-      'Authorization': 'Bearer ' + sessionStorage['access_token']
-    }
-  };
-
-  let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=50', options);
-  let data = await res.json();
-
-  return data.items;
-}
-
-async function generatePlaylist(name, description)
-{
-
-  let options = {
-    method: "POST",
-    headers: {
-      'Authorization': 'Bearer ' + sessionStorage['access_token'],
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: name,
-      description: description,
-      public: false
-    })
-  };
-
-  let res = await fetch('https://api.spotify.com/v1/users/' + sessionStorage['id'] + '/playlists', options);
-  let data = await res.json();
-
-  return data;
-}
+// async function generatePlaylist(name, description)
+// {
+//
+//   let options = {
+//     method: "POST",
+//     headers: {
+//       'Authorization': 'Bearer ' + sessionStorage['access_token'],
+//       'Content-Type': 'application/json'
+//     },
+//     body: JSON.stringify({
+//       name: name,
+//       description: description,
+//       public: false
+//     })
+//   };
+//
+//   let res = await fetch('https://api.spotify.com/v1/users/' + sessionStorage['id'] + '/playlists', options);
+//   let data = await res.json();
+//
+//   return data;
+// }

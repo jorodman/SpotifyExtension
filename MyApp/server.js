@@ -32,7 +32,6 @@ setupDatabaseConnection();
 async function setupDatabaseConnection()
 {
     await connection.connect();
-    let users = await connection.query('Select * from users');
 }
 
 app.get('/login', function(req, res) {
@@ -52,34 +51,6 @@ app.get('/login', function(req, res) {
             show_dialog: true
         }));
 });
-
-app.get('/friends', async function(req, res) {
-
-    let friends = [];
-
-    let users = await connection.query('Select * from users');
-
-    for(let user of users)
-    {
-        let options = {
-            url: 'https://api.spotify.com/v1/me/following/contains?type=user&ids=' + user.name,
-            headers: { 'Authorization': 'Bearer ' + access_token },
-            json: true
-        };
-
-        let response = await fetch('https://api.spotify.com/v1/me/following/contains?type=user&ids=' + user.name, options);
-        let following = await response.json();
-
-        if(following[0])
-        {
-            friends.push(user);
-        }
-    }
-
-    res.setHeader('Content-Type', 'application/json');
-    res.send(JSON.stringify(friends));
-});
-
 
 app.get('/callback', async function(req, res)
 {
@@ -112,42 +83,54 @@ app.get('/callback', async function(req, res)
             json: true
         };
 
-        request.post(authOptions, function(error, response, body)
-        {
-            if (!error && response.statusCode === 200)
+        let post = await new Promise(function (resolve, reject) {
+            request.post(authOptions, function(error, response, body)
             {
-                access_token = body.access_token;
-                refresh_token = body.refresh_token;
+                if (!error && response.statusCode === 200)
+                {
+                    access_token = body.access_token;
+                    refresh_token = body.refresh_token;
 
-                var options = {
-                  url: 'https://api.spotify.com/v1/me',
-                  headers: { 'Authorization': 'Bearer ' + access_token },
-                  json: true
-                };
+                    resolve();
+                }
+                else
+                {
+                    res.redirect('/#' +
+                    querystring.stringify({
+                        error: 'invalid_token'
+                    }));
 
-                // use the access token to access the Spotify Web API
-                request.get(options, function(error, response, body) {
-                    if(response.statusCode === 200)
-                    {
-                        connection.addUser(body.id, access_token, refresh_token);
-                    }
-                    else
-                    {
-                        console.log(response.statusCode);
-                    }
-                });
-
-                // we can also pass the token to the browser to make requests from there
-                res.redirect('/friends.html?access_token=' + access_token);
-            }
-            else
-            {
-                res.redirect('/#' +
-                querystring.stringify({
-                    error: 'invalid_token'
-                }));
-            }
+                    reject();
+                }
+            });
         });
+
+        var options = {
+          url: 'https://api.spotify.com/v1/me',
+          headers: { 'Authorization': 'Bearer ' + access_token },
+          json: true
+        };
+
+        let user = await new Promise(function (resolve, reject) {
+            request.get(options, async function(error, response, body) {
+                if(response.statusCode === 200)
+                {
+                    let userAdded = await connection.addUser(body.id, access_token, refresh_token);
+                    resolve(body.id);
+                }
+                else
+                {
+                    console.log("/Me request status code: ", response.statusCode);
+                    reject(response.statusCode);
+                }
+            });
+        });
+
+        let listOfUserPreferences = await connection.query("Select fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist from users where name = \'" + user + "\'");
+        let pref = listOfUserPreferences[0];
+
+        // we can also pass the token to the browser to make requests from there
+        res.redirect('/index.html?access_token=' + access_token + "&fourWeekPlaylist=" + pref.fourWeekPlaylist + "&sixMonthPlaylist=" + pref.sixMonthPlaylist + "&allTimePlaylist=" + pref.allTimePlaylist);
     }
 });
 
@@ -156,39 +139,76 @@ app.get('/access_token', function(req, res) {
   res.send({ access_token: access_token });
 });
 
-app.get("/mutualPlaylist", function(req, res)
-{
-    let parsedURL = url.parse(req.url, true);
-    let friendUsername = parsedURL.query.username;
+// TODO: Verify that a playlist does not exist already
+app.get('/generatePlaylist', async function(req, res) {
+    let timePeriod = req.query.timePeriod;
+    let user = req.query.user;
 
-    let success = await generateMutualPlaylist(friendUsername);
+    let description = "";
+    let results = await connection.query("Select access_token from users where name = '" + user + "\'");
+    let access_token_from_db = results[0].access_token;
 
-    res.writeHead(200, {"Access-Control-Allow-Origin": "*"});
-    res.end('ok');
+    let playlistName = "";
+
+    if(timePeriod === "fourWeekPlaylist")
+    {
+        playlistName = "Four Week Roundup";
+    }
+    else if(timePeriod === "sixMonthPlaylist")
+    {
+        playlistName = "Six Month Summary";
+    }
+    else
+    {
+        playlistName = "All Time Favorites";
+    }
+
+    try
+    {
+        let playlist = await generatePlaylist(playlistName, description, user, access_token_from_db);
+        let userPreference = await connection.query("update users set " + timePeriod + "=1");
+        let success = await connection.query("insert into playlists (id, type, userName) values (\'" + playlist.id + "\',\'" + timePeriod + "\', \'" + user + "\')");
+
+        res.sendStatus(200);
+    }
+    catch(error)
+    {
+        res.sendStatus(400);
+    }
 });
 
-app.get('/refresh_token', function(req, res) {
+app.get('/deletePlaylist', async function(req, res) {
 
-  // requesting access token from refresh token
-  var refresh_token = req.query.refresh_token;
-  var authOptions = {
-    url: 'https://accounts.spotify.com/api/token',
-    headers: { 'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64')) },
-    form: {
-      grant_type: 'refresh_token',
-      refresh_token: refresh_token
-    },
-    json: true
-  };
+    let timePeriod = req.query.timePeriod;
+    let user = req.query.user;
 
-  request.post(authOptions, function(error, response, body) {
-    if (!error && response.statusCode === 200) {
-      var access_token = body.access_token;
-      res.send({
-        'access_token': access_token
-      });
+    try
+    {
+        let results = await connection.query("Select access_token from users where name = '" + user + "\'");
+        let access_token_from_db = results[0].access_token;
+
+        let playlists = await connection.query("select id from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
+        let id = playlists[0].id;
+
+        let options = {
+            method: "DELETE",
+            headers: {
+              'Authorization': 'Bearer ' + access_token_from_db
+            }
+        }
+
+        let unfollowed = await fetch("https://api.spotify.com/v1/playlists/" + id + "/followers", options);
+
+        let db_results = await connection.query("delete from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
+        let userPreference = await connection.query("update users set " + timePeriod + "=0");
+
+        res.sendStatus(200);
     }
-  });
+    catch(error)
+    {
+        console.log(error)
+        res.sendStatus(400);
+    }
 });
 
 
@@ -201,144 +221,6 @@ var generateRandomString = function(length) {
     }
     return text;
 };
-
-async function generateMutualPlaylist(friendUsername)
-{
-    let playlist = await generatePlaylist("Mutual Playlist", "", friendUsername, access_token);
-
-    let friendAccessToken = await connection.query('Select access_token, refresh_token from users where name = ' + friendUsername);
-
-    let u1Short = await getTopTracks("short_term", access_token);
-    let u1Medium = await getTopTracks("medium_term", access_token);
-    let u1Long = await getTopTracks("long_term", access_token);
-
-    let u1Songs = u1Short.concat(u1Medium).concat(u1Long);
-
-    let u1SongIDs = [];
-
-    for(let song of u1Songs)
-    {
-        u1SongIDs.push(song.id);
-    }
-
-    let u2Short = await getTopTracks("short_term", friendAccessToken);
-    let u2Medium = await getTopTracks("medium_term", friendAccessToken);
-    let u2Long = await getTopTracks("long_term", friendAccessToken);
-
-    let u2Songs = u2Short.concat(u2Medium).concat(u2Long);
-
-    let u2SongIDs = [];
-
-    for(let song of u2Songs)
-    {
-        u2SongIDs.push(song.id);
-    }
-
-    let mutualSongIDs = [];
-
-    for(let song of u1SongIDs)
-    {
-        if(u2SongIDs.includes(song.id))
-        {
-            mutualSongIDs.push(song.id);
-        }
-    }
-
-    if(mutualSongIDs.length >= 20)
-    {
-        // return mutualSongIDs;
-    }
-
-    console.log("Length after top songs: " + mutualSongIDs.length);
-
-    let u1SavedTracks = await getAllSavedTracks(access_token);
-
-    let u1SavedTrackIDs = [];
-
-    for(let song of u1SavedTracks)
-    {
-        u1SavedTrackIDs.push(song.id);
-    }
-
-    let u2SavedTracks = await getAllSavedTracks(friendAccessToken);
-
-    let u2SavedTrackIDs = [];
-
-    for(let song of u2SavedTracks)
-    {
-        u2SavedTrackIDs.push(song.id);
-    }
-
-    for(let song of u2SavedTrackIDs)
-    {
-        if(u1SavedTrackIDs.includes(song.id))
-        {
-            mutualSongIDs.push(song.id);
-        }
-    }
-
-    console.log("Length after liked songs: " + mutualSongIDs.length);
-    // Make sure multiple genres accounted for?
-
-    if(mutualSongIDs.length >= 20)
-    {
-        // return mutualSongIDs;
-    }
-
-
-    // get top genres from both of them, and then filter their top songs by genres
-    // Then filter their liked songs by genre
-
-}
-
-// TODO add a number of songs param
-async function getTopTracks(timePeriod, access_token_param)
-{
-    let options = {
-        method: "GET",
-        headers: {
-          'Authorization': 'Bearer ' + access_token_param
-        }
-    };
-
-    let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=50', options);
-    let data = await res.json();
-
-    return data.items;
-}
-
-async function getAllSavedTracks(access_token_param)
-{
-    let maxTracks = 50;
-    let tracks = [];
-    let offset = 0;
-    let previousNumTracks;
-
-    let options = {
-      method: "GET",
-      headers: {
-        'Authorization': 'Bearer ' + access_token_param
-      }
-    };
-
-    // Takes roughly 4 seconds for 1300 songs
-    do
-    {
-        let res = await fetch('https://api.spotify.com/v1/me/tracks?limit=50&offset=' + offset, options);
-        let data = await res.json();
-
-        previousNumTracks = data.items.length;
-        offset += previousNumTracks;
-
-        for(let song of data.items)
-        {
-            tracks.push(song.track);
-        }
-    }
-    while (previousNumTracks == maxTracks)
-
-    return tracks;
-}
 
 
 async function generatePlaylist(name, description, userID, access_token_param)
