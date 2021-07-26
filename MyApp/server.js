@@ -19,11 +19,7 @@ var access_token;
 
 var stateKey = 'spotify_auth_state';
 
-var app = express();
-
-app.use(express.static(__dirname + '/public'))
-   .use(cors())
-   .use(cookieParser()).listen(8888);
+var app;
 
 var connection = new DatabaseClient();
 
@@ -31,15 +27,28 @@ setupDatabaseConnection();
 
 async function setupDatabaseConnection()
 {
-    await connection.connect();
+    try
+    {
+        let connected = await connection.connect();
+
+        app = express();
+
+        app.use(express.static(__dirname + '/public'))
+           .use(cors())
+           .use(cookieParser()).listen(8888);
+    }
+    catch(error)
+    {
+        console.log(error);
+    }
 }
 
-app.get('/login', function(req, res) {
-
+app.get('/login', function(req, res)
+{
     var state = generateRandomString(16);
     res.cookie(stateKey, state);
 
-    // your application requests authorization
+    // TODO: What authorization is needed as of now?
     var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
     res.redirect('https://accounts.spotify.com/authorize?' +
         querystring.stringify({
@@ -70,21 +79,23 @@ app.get('/callback', async function(req, res)
     {
         res.clearCookie(stateKey);
 
-        var authOptions = {
-            url: 'https://accounts.spotify.com/api/token',
-            form: {
-                code: code,
-                redirect_uri: redirect_uri,
-                grant_type: 'authorization_code'
-            },
-            headers: {
-                'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
-            },
-            json: true
-        };
+        // Requests the access_token and refresh_token from spotify
+        let tokenRequest = await new Promise(function (resolve, reject) {
 
-        let post = await new Promise(function (resolve, reject) {
-            request.post(authOptions, function(error, response, body)
+            let options = {
+                url: 'https://accounts.spotify.com/api/token',
+                form: {
+                    code: code,
+                    redirect_uri: redirect_uri,
+                    grant_type: 'authorization_code'
+                },
+                headers: {
+                    'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+                },
+                json: true
+            };
+
+            request.post(options, function(error, response, body)
             {
                 if (!error && response.statusCode === 200)
                 {
@@ -105,13 +116,15 @@ app.get('/callback', async function(req, res)
             });
         });
 
-        var options = {
-          url: 'https://api.spotify.com/v1/me',
-          headers: { 'Authorization': 'Bearer ' + access_token },
-          json: true
-        };
+        // Requests the users info from spotify and adds to the database
+        let userRequest = await new Promise(function (resolve, reject) {
 
-        let user = await new Promise(function (resolve, reject) {
+            let options = {
+              url: 'https://api.spotify.com/v1/me',
+              headers: { 'Authorization': 'Bearer ' + access_token },
+              json: true
+            };
+
             request.get(options, async function(error, response, body) {
                 if(response.statusCode === 200)
                 {
@@ -120,23 +133,23 @@ app.get('/callback', async function(req, res)
                 }
                 else
                 {
-                    console.log("/Me request status code: ", response.statusCode);
                     reject(response.statusCode);
                 }
             });
         });
 
         let listOfUserPreferences = await connection.query("Select fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist from users where name = \'" + user + "\'");
-        let pref = listOfUserPreferences[0];
+        let preferencesObj = listOfUserPreferences[0];
 
-        // we can also pass the token to the browser to make requests from there
-        res.redirect('/index.html?access_token=' + access_token + "&fourWeekPlaylist=" + pref.fourWeekPlaylist + "&sixMonthPlaylist=" + pref.sixMonthPlaylist + "&allTimePlaylist=" + pref.allTimePlaylist);
+        // Send the user prefrences and the access_token to the browser
+        // TODO: don't send the access_token, send just the user ID
+        res.redirect('/index.html?access_token=' + access_token + "&fourWeekPlaylist=" + preferencesObj.fourWeekPlaylist + "&sixMonthPlaylist=" + preferencesObj.sixMonthPlaylist + "&allTimePlaylist=" + preferencesObj.allTimePlaylist);
     }
 });
 
 app.get('/access_token', function(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.send({ access_token: access_token });
+    res.setHeader('Content-Type', 'application/json');
+    res.send({ access_token: access_token });
 });
 
 // TODO: Verify that a playlist does not exist already
@@ -206,41 +219,50 @@ app.get('/deletePlaylist', async function(req, res) {
     }
     catch(error)
     {
-        console.log(error)
+        console.log(error);
         res.sendStatus(400);
     }
 });
 
 
-var generateRandomString = function(length) {
+function generateRandomString(length)
+{
     var text = '';
     var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-    for (var i = 0; i < length; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
+    for (var i = 0; i < length; i++)
+    {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
+
     return text;
-};
+}
 
 
 async function generatePlaylist(name, description, userID, access_token_param)
 {
+    let options = {
+        method: "POST",
+        headers: {
+          'Authorization': 'Bearer ' + access_token_param,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: name,
+          description: description,
+          public: false
+        })
+    };
 
-  let options = {
-    method: "POST",
-    headers: {
-      'Authorization': 'Bearer ' + access_token_param,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: name,
-      description: description,
-      public: false
-    })
-  };
+    try
+    {
+        let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
+        let data = await res.json();
 
-  let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
-  let data = await res.json();
-
-  return data;
+        return data;
+    }
+    catch(error)
+    {
+        throw new Error(error);
+    }
 }
