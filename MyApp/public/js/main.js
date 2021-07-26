@@ -4,51 +4,28 @@ window.onload = async function()
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
 
-    const access_token = urlParams.get('access_token');
-    const fourWeeks = urlParams.get("fourWeekPlaylist");
-    const sixMonths = urlParams.get("sixMonthPlaylist");
-    const allTime = urlParams.get("allTimePlaylist");
-    const error = urlParams.get('error');
+    // Get info from the URL
+    const id = urlParams.get('id');
+    const fourWeekPlaylist = urlParams.get("fourWeekPlaylist");
+    const sixMonthPlaylist = urlParams.get("sixMonthPlaylist");
+    const allTimePlaylist = urlParams.get("allTimePlaylist");
 
-    if (error)
+    if(id)
     {
-        alert('There was an error during the authentication');
+        sessionStorage['id'] = id;
+        sessionStorage['fourWeekPlaylist'] = fourWeekPlaylist;
+        sessionStorage['sixMonthPlaylist'] = sixMonthPlaylist;
+        sessionStorage['allTimePlaylist'] = allTimePlaylist;
+
+        updatePageWithLogin();
     }
-    else
+    else if(sessionStorage['id'])
     {
-        if (access_token)
-        {
-            let options =
-            {
-                url: 'https://api.spotify.com/v1/me',
-                headers: { 'Authorization': 'Bearer ' + access_token },
-                json: true
-            };
-
-            let myResp = await fetch('https://api.spotify.com/v1/me', options);
-            let userdata = await myResp.json();
-
-            sessionStorage['access_token'] = access_token;
-            // sessionStorage['display_name'] = userdata.display_name;
-            sessionStorage['id'] = userdata.id;
-            sessionStorage['fourWeekPlaylist'] = fourWeeks;
-            sessionStorage['sixMonthPlaylist'] = sixMonths;
-            sessionStorage['allTimePlaylist'] = allTime;
-
-            login();
-        }
-        else if(sessionStorage['access_token'])
-        {
-            login();
-        }
-        else
-        {
-            console.log('no access token');
-        }
+        updatePageWithLogin();
     }
 }
 
-function login()
+function updatePageWithLogin()
 {
     let itemsToShow = document.querySelectorAll(".logged-in");
 
@@ -67,7 +44,7 @@ function login()
     //************* ADD EVENT LISTENERS TO PLAYLIST GENERATE BUTTONS *************//
 
     let fourWeekButton = document.getElementById("generateFourWeek");
-    fourWeekButton.addEventListener("click", generatePlaylistHack.bind(this, "fourWeekPlaylist", fourWeekButton));
+    fourWeekButton.addEventListener("click", onClickPlaylistButton.bind(this, "fourWeekPlaylist", fourWeekButton));
 
     if(sessionStorage['fourWeekPlaylist'] === "1")
     {
@@ -75,7 +52,7 @@ function login()
     }
 
     let sixMonthButton = document.getElementById("generateSixMonth");
-    sixMonthButton.addEventListener("click", generatePlaylistHack.bind(this, "sixMonthPlaylist", sixMonthButton));
+    sixMonthButton.addEventListener("click", onClickPlaylistButton.bind(this, "sixMonthPlaylist", sixMonthButton));
 
     if(sessionStorage['sixMonthPlaylist'] === "1")
     {
@@ -83,7 +60,7 @@ function login()
     }
 
     let allTimeButton = document.getElementById("generateAllTime");
-    allTimeButton.addEventListener("click", generatePlaylistHack.bind(this, "allTimePlaylist", allTimeButton));
+    allTimeButton.addEventListener("click", onClickPlaylistButton.bind(this, "allTimePlaylist", allTimeButton));
 
     if(sessionStorage['allTimePlaylist'] === "1")
     {
@@ -92,8 +69,9 @@ function login()
 
 }
 
-function generatePlaylistHack(timePeriod, button)
+function onClickPlaylistButton(timePeriod, button)
 {
+    // TODO don't use button innerText cause the user can change this
     if(button.innerText === "Generate")
     {
         generatePlaylist(timePeriod);
@@ -106,12 +84,12 @@ function generatePlaylistHack(timePeriod, button)
 
 async function generatePlaylist(timePeriod)
 {
-    let options = {
-        method: "GET"
-    };
-
     try
     {
+        let options = {
+            method: "GET"
+        };
+
         let res = await fetch('/generatePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
 
         updatePlaylistButtonText(timePeriod, "Delete");
@@ -124,12 +102,12 @@ async function generatePlaylist(timePeriod)
 
 async function deletePlaylist(timePeriod)
 {
-    let options = {
-        method: "GET"
-    };
-
     try
     {
+        let options = {
+            method: "GET"
+        };
+
         let res = await fetch('/deletePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
 
         if(res.status === 200)
@@ -145,22 +123,25 @@ async function deletePlaylist(timePeriod)
 
 function updatePlaylistButtonText(type, text)
 {
+    let button;
+
     if(type === "fourWeekPlaylist")
     {
-        let fourWeekButton = document.getElementById("generateFourWeek");
-        fourWeekButton.innerText = text;
+        button = document.getElementById("generateFourWeek");
     }
     else if(type === "sixMonthPlaylist")
     {
-        let sixMonthButton = document.getElementById("generateSixMonth");
-        sixMonthButton.innerText = text;
+        button = document.getElementById("generateSixMonth");
     }
     else if(type === "allTimePlaylist")
     {
-        let allTimeButton = document.getElementById("generateAllTime");
-        allTimeButton.innerText = text;
+        button = document.getElementById("generateAllTime");
     }
+
+    button.innerText = text;
 }
+
+/** Unused functions **/
 
 function logout()
 {
@@ -178,25 +159,3 @@ function logout()
         item.classList.add("d-none");
     }
 }
-
-// async function generatePlaylist(name, description)
-// {
-//
-//   let options = {
-//     method: "POST",
-//     headers: {
-//       'Authorization': 'Bearer ' + sessionStorage['access_token'],
-//       'Content-Type': 'application/json'
-//     },
-//     body: JSON.stringify({
-//       name: name,
-//       description: description,
-//       public: false
-//     })
-//   };
-//
-//   let res = await fetch('https://api.spotify.com/v1/users/' + sessionStorage['id'] + '/playlists', options);
-//   let data = await res.json();
-//
-//   return data;
-// }

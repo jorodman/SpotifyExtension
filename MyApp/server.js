@@ -7,18 +7,15 @@ var cors = require('cors');
 const fetch = require('node-fetch');
 const url = require('url');
 
-
 var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
-var client_id = '68829692b36742b68cf3163a55138448'; // Your client id
-var client_secret = '761fc3a6e9054badb680d682b5dcd354'; // Your secret
-var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
-
-var access_token;
-
+var client_id = '68829692b36742b68cf3163a55138448';
+var client_secret = '761fc3a6e9054badb680d682b5dcd354'
+// TODO update this to the URL that the site is hosted on
+var redirect_uri = 'http://localhost:8888/callback';
 var stateKey = 'spotify_auth_state';
-
+var access_token;
 var app;
 
 var connection = new DatabaseClient();
@@ -44,6 +41,25 @@ async function setupDatabaseConnection()
 }
 
 app.get('/login', function(req, res)
+{
+    var state = generateRandomString(16);
+    res.cookie(stateKey, state);
+
+    // TODO: What authorization is needed as of now?
+    var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
+    res.redirect('https://accounts.spotify.com/authorize?' +
+        querystring.stringify({
+            response_type: 'code',
+            client_id: client_id,
+            scope: scope,
+            redirect_uri: redirect_uri,
+            state: state,
+            show_dialog: true
+        }));
+});
+
+
+app.get('/user_info', function(req, res)
 {
     var state = generateRandomString(16);
     res.cookie(stateKey, state);
@@ -138,12 +154,11 @@ app.get('/callback', async function(req, res)
             });
         });
 
-        let listOfUserPreferences = await connection.query("Select fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist from users where name = \'" + user + "\'");
+        let listOfUserPreferences = await connection.query("Select fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist from users where name = \'" + userRequest + "\'");
         let preferencesObj = listOfUserPreferences[0];
 
         // Send the user prefrences and the access_token to the browser
-        // TODO: don't send the access_token, send just the user ID
-        res.redirect('/index.html?access_token=' + access_token + "&fourWeekPlaylist=" + preferencesObj.fourWeekPlaylist + "&sixMonthPlaylist=" + preferencesObj.sixMonthPlaylist + "&allTimePlaylist=" + preferencesObj.allTimePlaylist);
+        res.redirect('/index.html?id=' + userRequest.id + "&fourWeekPlaylist=" + preferencesObj.fourWeekPlaylist + "&sixMonthPlaylist=" + preferencesObj.sixMonthPlaylist + "&allTimePlaylist=" + preferencesObj.allTimePlaylist);
     }
 });
 
