@@ -5,27 +5,27 @@ window.onload = async function()
     const urlParams = new URLSearchParams(queryString);
 
     // Get info from the URL
-    const id = urlParams.get('id');
+    const userID = urlParams.get('id');
     const fourWeekPlaylist = urlParams.get("fourWeekPlaylist");
     const sixMonthPlaylist = urlParams.get("sixMonthPlaylist");
     const allTimePlaylist = urlParams.get("allTimePlaylist");
 
-    if(id)
+    if(userID)
     {
-        sessionStorage['id'] = id;
+        sessionStorage['userID'] = userID;
         sessionStorage['fourWeekPlaylist'] = fourWeekPlaylist;
         sessionStorage['sixMonthPlaylist'] = sixMonthPlaylist;
         sessionStorage['allTimePlaylist'] = allTimePlaylist;
 
-        updatePageWithLogin();
+        updatePageAfterLogin();
     }
-    else if(sessionStorage['id'])
+    else if(sessionStorage['userID'])
     {
-        updatePageWithLogin();
+        updatePageAfterLogin();
     }
 }
 
-function updatePageWithLogin()
+function updatePageAfterLogin()
 {
     let itemsToShow = document.querySelectorAll(".logged-in");
 
@@ -90,7 +90,7 @@ async function generatePlaylist(timePeriod)
             method: "GET"
         };
 
-        let res = await fetch('/generatePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
+        let res = await fetch('/generatePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['userID'], options);
 
         updatePlaylistButtonText(timePeriod, "Delete");
     }
@@ -108,7 +108,7 @@ async function deletePlaylist(timePeriod)
             method: "GET"
         };
 
-        let res = await fetch('/deletePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['id'], options);
+        let res = await fetch('/deletePlaylist?timePeriod=' + timePeriod + "&user=" + sessionStorage['userID'], options);
 
         if(res.status === 200)
         {

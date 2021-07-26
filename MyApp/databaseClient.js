@@ -41,7 +41,7 @@ class DatabaseClient
     {
         try
         {
-            let sql = "Insert into users (name, access_token, refresh_token, fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist) values (\'" + id + "\',\'" + access_token + "\',\'" + refresh_token + "\', 0, 0, 0) on duplicate key update access_token = \'" + access_token + "\', refresh_token = \'" + refresh_token + "\', fourWeekPlaylist=0, sixMonthPlaylist=0, allTimePlaylist=0";
+            let sql = "Insert into users (name, access_token, refresh_token) values (\'" + id + "\',\'" + access_token + "\',\'" + refresh_token + "\') on duplicate key update access_token = \'" + access_token + "\', refresh_token = \'" + refresh_token + "\'";
             let result = await this.query(sql);
             return result;
         }

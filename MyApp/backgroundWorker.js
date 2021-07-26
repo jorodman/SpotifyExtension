@@ -36,14 +36,15 @@ async function updateAllPlaylists()
     {
         let access_token = await getAccessToken(user.refresh_token);
 
-        if(user.fourWeekPlaylist)
+        // TODO: update to use the new database schema
+        if(user)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = 'fourWeekPlaylist'");
             let playlistObj = queryResults[0];
 
             if(playlistObj)
             {
-                let tracks = await getTopTracks("short_term", access_token, 80);
+                let tracks = await getTopTracks("short_term", access_token, 100);
 
                 // TODO maybe change this to a clear playlist function?
                 let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistObj.id, access_token, []);
@@ -51,7 +52,7 @@ async function updateAllPlaylists()
             }
         }
 
-        if(user.sixMonthPlaylist)
+        if(user)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'sixMonthPlaylist\'");
             let playlistObj = queryResults[0];
@@ -64,7 +65,7 @@ async function updateAllPlaylists()
             }
         }
 
-        if(user.allTimePlaylist)
+        if(user)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'allTimePlaylist\'");
             let playlistObj = queryResults[0];

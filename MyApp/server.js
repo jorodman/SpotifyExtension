@@ -16,7 +16,12 @@ var client_secret = '761fc3a6e9054badb680d682b5dcd354'
 var redirect_uri = 'http://localhost:8888/callback';
 var stateKey = 'spotify_auth_state';
 var access_token;
-var app;
+
+var app = express();
+
+app.use(express.static(__dirname + '/public'))
+   .use(cors())
+   .use(cookieParser()).listen(8888);
 
 var connection = new DatabaseClient();
 
@@ -27,12 +32,6 @@ async function setupDatabaseConnection()
     try
     {
         let connected = await connection.connect();
-
-        app = express();
-
-        app.use(express.static(__dirname + '/public'))
-           .use(cors())
-           .use(cookieParser()).listen(8888);
     }
     catch(error)
     {
@@ -154,11 +153,37 @@ app.get('/callback', async function(req, res)
             });
         });
 
-        let listOfUserPreferences = await connection.query("Select fourWeekPlaylist, sixMonthPlaylist, allTimePlaylist from users where name = \'" + userRequest + "\'");
-        let preferencesObj = listOfUserPreferences[0];
+        // TODO error handling if a rejection occurs
+        let userPlaylistsQueryResults = await connection.query("Select type from users natural join playlists where name = \'" + userRequest + "\'");
+        let playlistTypes = userPlaylistsQueryResults[0];
+
+        let fourWeekPlaylist = 0;
+        let sixMonthPlaylist = 0;
+        let allTimePlaylist = 0;
+
+        if(playlistTypes)
+        {
+            for(let type of playlistTypes)
+            {
+                console.log("Playlist type: " + type);
+
+                if(type === "fourWeekPlaylist")
+                {
+                    fourWeekPlaylist = 1;
+                }
+                else if(type === "sixMonthPlaylist")
+                {
+                    sixMonthPlaylist = 1;
+                }
+                else if(type === "allTimePlaylist")
+                {
+                    allTimePlaylist = 1;
+                }
+            }
+        }
 
         // Send the user prefrences and the access_token to the browser
-        res.redirect('/index.html?id=' + userRequest.id + "&fourWeekPlaylist=" + preferencesObj.fourWeekPlaylist + "&sixMonthPlaylist=" + preferencesObj.sixMonthPlaylist + "&allTimePlaylist=" + preferencesObj.allTimePlaylist);
+        res.redirect('/index.html?id=' + userRequest + "&fourWeekPlaylist=" + fourWeekPlaylist + "&sixMonthPlaylist=" + sixMonthPlaylist + "&allTimePlaylist=" + allTimePlaylist);
     }
 });
 
@@ -194,7 +219,6 @@ app.get('/generatePlaylist', async function(req, res) {
     try
     {
         let playlist = await generatePlaylist(playlistName, description, user, access_token_from_db);
-        let userPreference = await connection.query("update users set " + timePeriod + "=1");
         let success = await connection.query("insert into playlists (id, type, userName) values (\'" + playlist.id + "\',\'" + timePeriod + "\', \'" + user + "\')");
 
         res.sendStatus(200);
