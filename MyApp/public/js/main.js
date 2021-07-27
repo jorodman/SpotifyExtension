@@ -23,6 +23,9 @@ window.onload = async function()
     {
         updatePageAfterLogin();
     }
+
+    let clearDataButton = document.getElementById("clearDataButton");
+    clearDataButton.addEventListener("click", onClickClearData.bind(this, clearDataButton));
 }
 
 function updatePageAfterLogin()
@@ -66,7 +69,45 @@ function updatePageAfterLogin()
     {
         allTimeButton.innerText = "Delete";
     }
+}
 
+async function onClickClearData()
+{
+    // The user is logged in
+    if(sessionStorage['userID'])
+    {
+        let options = {
+            method: "GET"
+        };
+
+        let res = await fetch('/clearData?user=' + sessionStorage['userID'], options);
+
+        if(res.status === 200)
+        {
+            alert("You have been logged out and your data has been cleared")
+        }
+        else
+        {
+            alert("ERROR clearing data");
+        }
+    }
+    else
+    {
+        let options = {
+            method: "GET"
+        };
+
+        let res = await fetch('/clearDataLoginFirst', options);
+
+        if(res.status === 200)
+        {
+            alert("Your data has been cleared")
+        }
+        else
+        {
+            alert("ERROR clearing data");
+        }
+    }
 }
 
 function onClickPlaylistButton(timePeriod, button)

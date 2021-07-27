@@ -16,6 +16,7 @@ async function setupDatabaseConnection()
     try
     {
         let connected = await connection.connect();
+        let deleted = await checkForDeletedPlaylists();
         let playlistsUpdated = await updateAllPlaylists();
     }
     catch(error)
@@ -28,6 +29,77 @@ async function setupDatabaseConnection()
     }
 }
 
+async function getUserPreferences(userName)
+{
+    let playlists = await connection.query("Select type from users natural join playlists where name = \'" + userName + "\'");
+
+    let fourWeekPlaylist = false;
+    let sixMonthPlaylist = false;
+    let allTimePlaylist = false;
+
+    if(playlists)
+    {
+        for(let playlist of playlists)
+        {
+            if(playlist.type === "fourWeekPlaylist")
+            {
+                fourWeekPlaylist = true;
+            }
+            else if(playlist.type === "sixMonthPlaylist")
+            {
+                sixMonthPlaylist = true;
+            }
+            else if(playlist.type === "allTimePlaylist")
+            {
+                allTimePlaylist = true;
+            }
+        }
+    }
+
+    return {
+        fourWeekPlaylist: fourWeekPlaylist,
+        sixMonthPlaylist: sixMonthPlaylist,
+        allTimePlaylist: allTimePlaylist
+    };
+}
+
+async function checkForDeletedPlaylists()
+{
+    let playlists = await connection.query("Select id, userName from playlists");
+
+    for(let playlist of playlists)
+    {
+        let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
+        let user = users[0];
+
+        let access_token = await getAccessToken(user.refresh_token);
+
+        let options = {
+            method: "GET",
+            headers: {
+              'Authorization': 'Bearer ' + access_token
+            }
+        };
+
+        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
+
+        if(res.status === 404)
+        {
+            let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
+        }
+        else
+        {
+            let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
+            let following = await response.json();
+
+            if(!following[0])
+            {
+                let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
+            }
+        }
+    }
+}
+
 async function updateAllPlaylists()
 {
     let users = await connection.query("Select * from users");
@@ -36,8 +108,10 @@ async function updateAllPlaylists()
     {
         let access_token = await getAccessToken(user.refresh_token);
 
+        let preferences = await getUserPreferences(user.name);
+
         // TODO: update to use the new database schema
-        if(user)
+        if(preferences.fourWeekPlaylist)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = 'fourWeekPlaylist'");
             let playlistObj = queryResults[0];
@@ -52,7 +126,7 @@ async function updateAllPlaylists()
             }
         }
 
-        if(user)
+        if(preferences.sixMonthPlaylist)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'sixMonthPlaylist\'");
             let playlistObj = queryResults[0];
@@ -65,7 +139,7 @@ async function updateAllPlaylists()
             }
         }
 
-        if(user)
+        if(preferences.allTimePlaylist)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = \'allTimePlaylist\'");
             let playlistObj = queryResults[0];
@@ -107,13 +181,21 @@ async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
 
     let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
 
+
     if(res.status === 201)
     {
         console.log("Playlist cleared");
     }
+    else if(res.status === 404)
+    {
+        // The resource does not exist - delete from database?
+        // No because there is no harm is trying to update a non existent playlist but there could be a temporary issue with spotify that causes a 404
+        // and it would be bad to delete the playlist from the database in that case
+        // Maybe do some sort of iterative thing instead?
+    }
     else
     {
-        console.log("Error clearing playlist");
+        console.log("Error clearing playlist: " + res.status);
     }
 }
 

@@ -11,11 +11,11 @@ var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
 var client_id = '68829692b36742b68cf3163a55138448';
-var client_secret = '761fc3a6e9054badb680d682b5dcd354'
+var client_secret = '761fc3a6e9054badb680d682b5dcd354';
+
 // TODO update this to the URL that the site is hosted on
-var redirect_uri = 'http://localhost:8888/callback';
+var redirect_uri = 'http://localhost:8888/login_callback';
 var stateKey = 'spotify_auth_state';
-var access_token;
 
 var app = express();
 
@@ -57,26 +57,7 @@ app.get('/login', function(req, res)
         }));
 });
 
-
-app.get('/user_info', function(req, res)
-{
-    var state = generateRandomString(16);
-    res.cookie(stateKey, state);
-
-    // TODO: What authorization is needed as of now?
-    var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
-    res.redirect('https://accounts.spotify.com/authorize?' +
-        querystring.stringify({
-            response_type: 'code',
-            client_id: client_id,
-            scope: scope,
-            redirect_uri: redirect_uri,
-            state: state,
-            show_dialog: true
-        }));
-});
-
-app.get('/callback', async function(req, res)
+app.get('/login_callback', async function(req, res)
 {
     var code = req.query.code || null;
     var state = req.query.state || null;
@@ -93,6 +74,9 @@ app.get('/callback', async function(req, res)
     else
     {
         res.clearCookie(stateKey);
+
+        // Needs to be accessible outside of the token request
+        let access_token;
 
         // Requests the access_token and refresh_token from spotify
         let tokenRequest = await new Promise(function (resolve, reject) {
@@ -132,7 +116,7 @@ app.get('/callback', async function(req, res)
         });
 
         // Requests the users info from spotify and adds to the database
-        let userRequest = await new Promise(function (resolve, reject) {
+        let user = await new Promise(function (resolve, reject) {
 
             let options = {
               url: 'https://api.spotify.com/v1/me',
@@ -154,28 +138,25 @@ app.get('/callback', async function(req, res)
         });
 
         // TODO error handling if a rejection occurs
-        let userPlaylistsQueryResults = await connection.query("Select type from users natural join playlists where name = \'" + userRequest + "\'");
-        let playlistTypes = userPlaylistsQueryResults[0];
+        let playlists = await connection.query("Select type from users natural join playlists where name = \'" + user + "\'");
 
         let fourWeekPlaylist = 0;
         let sixMonthPlaylist = 0;
         let allTimePlaylist = 0;
 
-        if(playlistTypes)
+        if(playlists)
         {
-            for(let type of playlistTypes)
+            for(let playlist of playlists)
             {
-                console.log("Playlist type: " + type);
-
-                if(type === "fourWeekPlaylist")
+                if(playlist.type === "fourWeekPlaylist")
                 {
                     fourWeekPlaylist = 1;
                 }
-                else if(type === "sixMonthPlaylist")
+                else if(playlist.type === "sixMonthPlaylist")
                 {
                     sixMonthPlaylist = 1;
                 }
-                else if(type === "allTimePlaylist")
+                else if(playlist.type === "allTimePlaylist")
                 {
                     allTimePlaylist = 1;
                 }
@@ -183,13 +164,8 @@ app.get('/callback', async function(req, res)
         }
 
         // Send the user prefrences and the access_token to the browser
-        res.redirect('/index.html?id=' + userRequest + "&fourWeekPlaylist=" + fourWeekPlaylist + "&sixMonthPlaylist=" + sixMonthPlaylist + "&allTimePlaylist=" + allTimePlaylist);
+        res.redirect('/index.html?id=' + user + "&fourWeekPlaylist=" + fourWeekPlaylist + "&sixMonthPlaylist=" + sixMonthPlaylist + "&allTimePlaylist=" + allTimePlaylist);
     }
-});
-
-app.get('/access_token', function(req, res) {
-    res.setHeader('Content-Type', 'application/json');
-    res.send({ access_token: access_token });
 });
 
 // TODO: Verify that a playlist does not exist already
@@ -261,6 +237,113 @@ app.get('/deletePlaylist', async function(req, res) {
         console.log(error);
         res.sendStatus(400);
     }
+});
+
+app.get('/clearData', async function(req, res)
+{
+    console.log("clear data");
+    let userName = req.query.user;
+
+    try
+    {
+        let deleted = await connection.query("delete from users where name = '" + userName + "\'");
+        console.log(deleted);
+
+        res.sendStatus(200);
+    }
+    catch(error)
+    {
+        res.sendStatus(400);
+    }
+});
+
+app.get('/clearDataLoginFirst', function(req, res)
+{
+    var state = generateRandomString(16);
+    res.cookie(stateKey, state);
+
+    // TODO: What authorization is needed as of now?
+    var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
+    res.redirect('https://accounts.spotify.com/authorize?' +
+        querystring.stringify({
+            response_type: 'code',
+            client_id: client_id,
+            scope: scope,
+            redirect_uri: 'http://localhost:8888/clearDataAfterLogin',
+            state: state,
+            show_dialog: true
+        }));
+});
+
+app.get('/clearDataAfterLogin', async function(req, res)
+{
+    console.log("clear data after login");
+
+    let access_token;
+
+    // Requests the access_token and refresh_token from spotify
+    let tokenRequest = await new Promise(function (resolve, reject) {
+
+        let options = {
+            url: 'https://accounts.spotify.com/api/token',
+            form: {
+                code: code,
+                redirect_uri: redirect_uri,
+                grant_type: 'authorization_code'
+            },
+            headers: {
+                'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+            },
+            json: true
+        };
+
+        request.post(options, function(error, response, body)
+        {
+            if (!error && response.statusCode === 200)
+            {
+                access_token = body.access_token;
+                refresh_token = body.refresh_token;
+
+                resolve();
+            }
+            else
+            {
+                res.redirect('/#' +
+                querystring.stringify({
+                    error: 'invalid_token'
+                }));
+
+                reject();
+            }
+        });
+    });
+
+    // Requests the users info from spotify and adds to the database
+    let userDeleted = await new Promise(function (resolve, reject) {
+
+        let options = {
+          url: 'https://api.spotify.com/v1/me',
+          headers: { 'Authorization': 'Bearer ' + access_token },
+          json: true
+        };
+
+        request.get(options, async function(error, response, body) {
+            if(response.statusCode === 200)
+            {
+                let deleted = await connection.query("delete from users where name = '" + body.id + "\'");
+                resolve(deleted);
+            }
+            else
+            {
+                reject(response.statusCode);
+            }
+        });
+    });
+
+    console.log(userDeleted);
+
+    // Send the user prefrences and the access_token to the browser
+    res.redirect('/index.html?dataCleared=' + true);
 });
 
 
