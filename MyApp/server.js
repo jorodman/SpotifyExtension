@@ -14,7 +14,7 @@ var client_id = '68829692b36742b68cf3163a55138448';
 var client_secret = '761fc3a6e9054badb680d682b5dcd354';
 
 // TODO update this to the URL that the site is hosted on
-var redirect_uri = 'http://localhost:8888/login_callback';
+var redirect_uri = 'http://localhost:8888/callback';
 var stateKey = 'spotify_auth_state';
 
 var app = express();
@@ -57,7 +57,7 @@ app.get('/login', function(req, res)
         }));
 });
 
-app.get('/login_callback', async function(req, res)
+app.get('/callback', async function(req, res)
 {
     var code = req.query.code || null;
     var state = req.query.state || null;
@@ -75,13 +75,12 @@ app.get('/login_callback', async function(req, res)
     {
         res.clearCookie(stateKey);
 
-        // Needs to be accessible outside of the token request
-        let access_token;
+        try
+        {
+            let string = (client_id + ':' + client_secret).toString('base64');
+            let buffer = Buffer.from(string);
 
-        // Requests the access_token and refresh_token from spotify
-        let tokenRequest = await new Promise(function (resolve, reject) {
-
-            let options = {
+            let tokenOptions = {
                 url: 'https://accounts.spotify.com/api/token',
                 form: {
                     code: code,
@@ -89,84 +88,86 @@ app.get('/login_callback', async function(req, res)
                     grant_type: 'authorization_code'
                 },
                 headers: {
-                    'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+                    'Authorization': 'Basic ' + buffer
                 },
                 json: true
             };
 
-            request.post(options, function(error, response, body)
-            {
-                if (!error && response.statusCode === 200)
-                {
-                    access_token = body.access_token;
-                    refresh_token = body.refresh_token;
+            // Requests the access_token and refresh_token from spotify
+            let tokenRequest = await postRequest(tokenOptions);
 
-                    resolve();
-                }
-                else
-                {
-                    res.redirect('/#' +
-                    querystring.stringify({
-                        error: 'invalid_token'
-                    }));
+            let access_token = tokenRequest.body.access_token;
+            let refresh_token = tokenRequest.body.refresh_token;
 
-                    reject();
-                }
-            });
-        });
-
-        // Requests the users info from spotify and adds to the database
-        let user = await new Promise(function (resolve, reject) {
-
-            let options = {
+            let getMeOptions = {
               url: 'https://api.spotify.com/v1/me',
               headers: { 'Authorization': 'Bearer ' + access_token },
               json: true
             };
 
-            request.get(options, async function(error, response, body) {
-                if(response.statusCode === 200)
-                {
-                    let userAdded = await connection.addUser(body.id, access_token, refresh_token);
-                    resolve(body.id);
-                }
-                else
-                {
-                    reject(response.statusCode);
-                }
-            });
-        });
+            let userResponse = await getRequest(getMeOptions);
 
-        // TODO error handling if a rejection occurs
-        let playlists = await connection.query("Select type from users natural join playlists where name = \'" + user + "\'");
+            let userAdded = await connection.addUser(userResponse.body.id, access_token, refresh_token);
+            let preferences = await getUserPreferences(userResponse.body.id);
 
-        let fourWeekPlaylist = 0;
-        let sixMonthPlaylist = 0;
-        let allTimePlaylist = 0;
-
-        if(playlists)
-        {
-            for(let playlist of playlists)
-            {
-                if(playlist.type === "fourWeekPlaylist")
-                {
-                    fourWeekPlaylist = 1;
-                }
-                else if(playlist.type === "sixMonthPlaylist")
-                {
-                    sixMonthPlaylist = 1;
-                }
-                else if(playlist.type === "allTimePlaylist")
-                {
-                    allTimePlaylist = 1;
-                }
-            }
+            // Send the user prefrences and the user id to the browser
+            res.redirect('/index.html?id=' + userResponse.body.id + "&fourWeekPlaylist=" + preferences.fourWeekPlaylist + "&sixMonthPlaylist=" + preferences.sixMonthPlaylist + "&allTimePlaylist=" + preferences.allTimePlaylist);
         }
+        catch(error)
+        {
+            console.log("ERROR: ", error);
 
-        // Send the user prefrences and the access_token to the browser
-        res.redirect('/index.html?id=' + user + "&fourWeekPlaylist=" + fourWeekPlaylist + "&sixMonthPlaylist=" + sixMonthPlaylist + "&allTimePlaylist=" + allTimePlaylist);
+            res.redirect('/#' +
+            querystring.stringify({
+                error: error
+            }));
+        }
     }
 });
+
+async function getRequest(options)
+{
+    return await new Promise(function (resolve, reject) {
+
+        request.post(options, function(error, response, body) {
+            if(!error)
+            {
+                resolve({
+                    response: response,
+                    body: body
+                });
+            }
+            else
+            {
+                reject({
+                    error: error
+                });
+            }
+        });
+    });
+}
+
+async function postRequest(options)
+{
+    return await new Promise(function (resolve, reject) {
+
+        request.get(options, function(error, response, body) {
+            if(!error)
+            {
+                resolve({
+                    response: response,
+                    body: body
+                });
+            }
+            else
+            {
+                reject({
+                    error: error
+                });
+            }
+        });
+    });
+}
 
 // TODO: Verify that a playlist does not exist already
 app.get('/generatePlaylist', async function(req, res) {
@@ -239,6 +240,86 @@ app.get('/deletePlaylist', async function(req, res) {
     }
 });
 
+
+function generateRandomString(length)
+{
+    var text = '';
+    var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+    for (var i = 0; i < length; i++)
+    {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+
+    return text;
+}
+
+
+async function getUserPreferences(userName)
+{
+    let playlists = await connection.query("Select type from users natural join playlists where name = \'" + userName + "\'");
+
+    let fourWeekPlaylist = 0;
+    let sixMonthPlaylist = 0;
+    let allTimePlaylist = 0;
+
+    if(playlists)
+    {
+        for(let playlist of playlists)
+        {
+            if(playlist.type === "fourWeekPlaylist")
+            {
+                fourWeekPlaylist = 1;
+            }
+            else if(playlist.type === "sixMonthPlaylist")
+            {
+                sixMonthPlaylist = 1;
+            }
+            else if(playlist.type === "allTimePlaylist")
+            {
+                allTimePlaylist = 1;
+            }
+        }
+    }
+
+    return {
+        fourWeekPlaylist: fourWeekPlaylist,
+        sixMonthPlaylist: sixMonthPlaylist,
+        allTimePlaylist: allTimePlaylist
+    };
+}
+
+
+async function generatePlaylist(name, description, userID, access_token_param)
+{
+    let options = {
+        method: "POST",
+        headers: {
+          'Authorization': 'Bearer ' + access_token_param,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: name,
+          description: description,
+          public: false
+        })
+    };
+
+    try
+    {
+        let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
+        let data = await res.json();
+
+        return data;
+    }
+    catch(error)
+    {
+        throw new Error(error);
+    }
+}
+
+/** Unused functions **/
+
 app.get('/clearData', async function(req, res)
 {
     console.log("clear data");
@@ -284,6 +365,10 @@ app.get('/clearDataAfterLogin', async function(req, res)
     // Requests the access_token and refresh_token from spotify
     let tokenRequest = await new Promise(function (resolve, reject) {
 
+        // let buffer = (new Buffer(client_id + ':' + client_secret).toString('base64'));
+        let string = (client_id + ':' + client_secret).toString('base64');
+        let buffer = Buffer.from(string);
+
         let options = {
             url: 'https://accounts.spotify.com/api/token',
             form: {
@@ -292,7 +377,7 @@ app.get('/clearDataAfterLogin', async function(req, res)
                 grant_type: 'authorization_code'
             },
             headers: {
-                'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+                'Authorization': 'Basic ' + buffer
             },
             json: true
         };
@@ -345,46 +430,3 @@ app.get('/clearDataAfterLogin', async function(req, res)
     // Send the user prefrences and the access_token to the browser
     res.redirect('/index.html?dataCleared=' + true);
 });
-
-
-function generateRandomString(length)
-{
-    var text = '';
-    var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-    for (var i = 0; i < length; i++)
-    {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-
-    return text;
-}
-
-
-async function generatePlaylist(name, description, userID, access_token_param)
-{
-    let options = {
-        method: "POST",
-        headers: {
-          'Authorization': 'Bearer ' + access_token_param,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: name,
-          description: description,
-          public: false
-        })
-    };
-
-    try
-    {
-        let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
-        let data = await res.json();
-
-        return data;
-    }
-    catch(error)
-    {
-        throw new Error(error);
-    }
-}
