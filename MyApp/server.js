@@ -24,7 +24,7 @@ app.use(express.static(__dirname + '/public'))
    .use(cookieParser()).listen(8888);
 
 // TODO update this with the IP of the actual database
-var connection = new DatabaseClient('3.141.201.107');
+var connection = new DatabaseClient();
 
 setupDatabaseConnection();
 
@@ -82,8 +82,6 @@ app.get('/callback', async function(req, res)
         {
             let string = (client_id + ':' + client_secret).toString('base64');
             let buffer = Buffer.from(string);
-
-            // let buffer = (new Buffer(client_id + ':' + client_secret).toString('base64'));
 
             let tokenOptions = {
                 url: 'https://accounts.spotify.com/api/token',
@@ -386,7 +384,6 @@ app.get('/clearDataAfterLogin', async function(req, res)
     // Requests the access_token and refresh_token from spotify
     let tokenRequest = await new Promise(function (resolve, reject) {
 
-        // let buffer = (new Buffer(client_id + ':' + client_secret).toString('base64'));
         let string = (client_id + ':' + client_secret).toString('base64');
         let buffer = Buffer.from(string);
 

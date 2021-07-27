@@ -3,10 +3,10 @@ var mysql = require('mysql');
 
 class DatabaseClient
 {
-    constructor(host)
+    constructor()
     {
         this.options = {
-             host: host,
+             host: '3.141.201.107',
              user: 'remote',
              password: 'RemotePWD1!',
              database: 'spotify'
