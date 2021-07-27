@@ -23,7 +23,8 @@ app.use(express.static(__dirname + '/public'))
    .use(cors())
    .use(cookieParser()).listen(8888);
 
-var connection = new DatabaseClient();
+// TODO update this with the IP of the actual database
+var connection = new DatabaseClient('3.141.201.107');
 
 setupDatabaseConnection();
 
@@ -35,17 +36,19 @@ async function setupDatabaseConnection()
     }
     catch(error)
     {
+        // TODO restart the server
         console.log(error);
     }
 }
+
+/******************************* Handling Webpage Requests *******************************/
 
 app.get('/login', function(req, res)
 {
     var state = generateRandomString(16);
     res.cookie(stateKey, state);
 
-    // TODO: What authorization is needed as of now?
-    var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
+    var scope = 'user-library-read user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private';
     res.redirect('https://accounts.spotify.com/authorize?' +
         querystring.stringify({
             response_type: 'code',
@@ -79,6 +82,8 @@ app.get('/callback', async function(req, res)
         {
             let string = (client_id + ':' + client_secret).toString('base64');
             let buffer = Buffer.from(string);
+
+            // let buffer = (new Buffer(client_id + ':' + client_secret).toString('base64'));
 
             let tokenOptions = {
                 url: 'https://accounts.spotify.com/api/token',
@@ -125,31 +130,83 @@ app.get('/callback', async function(req, res)
     }
 });
 
+app.get('/generatePlaylist', async function(req, res) {
+    let timePeriod = req.query.timePeriod;
+    let user = req.query.user;
+
+    if(user && timePeriod)
+    {
+        try
+        {
+            let results = await connection.query("Select access_token from users where name = '" + user + "\'");
+            let access_token_from_db = results[0].access_token;
+
+            let playlistName = getPlaylistNameFromTimePeriod(timePeriod);
+            let playlistDescription = "";
+
+            let playlist = await generatePlaylist(playlistName, playlistDescription, user, access_token_from_db);
+            let success = await connection.query("insert into playlists (id, type, userName) values (\'" + playlist.id + "\',\'" + timePeriod + "\', \'" + user + "\')");
+
+            res.sendStatus(200);
+        }
+        catch(error)
+        {
+            res.sendStatus(400);
+        }
+    }
+    else
+    {
+        res.sendStatus(400);
+    }
+});
+
+
+app.get('/deletePlaylist', async function(req, res) {
+
+    let timePeriod = req.query.timePeriod;
+    let user = req.query.user;
+
+    if(user && timePeriod)
+    {
+        try
+        {
+            let results = await connection.query("Select access_token from users where name = '" + user + "\'");
+            let access_token_from_db = results[0].access_token;
+
+            let playlists = await connection.query("select id from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
+
+            let id = playlists[0].id;
+
+            let options = {
+                method: "DELETE",
+                headers: {
+                  'Authorization': 'Bearer ' + access_token_from_db
+                }
+            }
+
+            let unfollowed = await fetch("https://api.spotify.com/v1/playlists/" + id + "/followers", options);
+            let db_results = await connection.query("delete from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
+
+            res.sendStatus(200);
+        }
+        catch(error)
+        {
+            console.log(error);
+            res.sendStatus(400);
+        }
+    }
+    else
+    {
+        res.sendStatus(400);
+    }
+});
+
+
+/******************************* Helper functions *******************************/
+
 async function getRequest(options)
 {
-    return await new Promise(function (resolve, reject) {
-
-        request.post(options, function(error, response, body) {
-            if(!error)
-            {
-                resolve({
-                    response: response,
-                    body: body
-                });
-            }
-            else
-            {
-                reject({
-                    error: error
-                });
-            }
-        });
-    });
-}
-
-async function postRequest(options)
-{
-    return await new Promise(function (resolve, reject) {
+    return new Promise(function (resolve, reject) {
 
         request.get(options, function(error, response, body) {
             if(!error)
@@ -169,15 +226,43 @@ async function postRequest(options)
     });
 }
 
-// TODO: Verify that a playlist does not exist already
-app.get('/generatePlaylist', async function(req, res) {
-    let timePeriod = req.query.timePeriod;
-    let user = req.query.user;
+async function postRequest(options)
+{
+    return new Promise(function (resolve, reject) {
 
-    let description = "";
-    let results = await connection.query("Select access_token from users where name = '" + user + "\'");
-    let access_token_from_db = results[0].access_token;
+        request.post(options, function(error, response, body) {
+            if(!error)
+            {
+                resolve({
+                    response: response,
+                    body: body
+                });
+            }
+            else
+            {
+                reject({
+                    error: error
+                });
+            }
+        });
+    });
+}
 
+function generateRandomString(length)
+{
+    var text = '';
+    var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+    for (var i = 0; i < length; i++)
+    {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+
+    return text;
+}
+
+function getPlaylistNameFromTimePeriod(timePeriod)
+{
     let playlistName = "";
 
     if(timePeriod === "fourWeekPlaylist")
@@ -193,67 +278,8 @@ app.get('/generatePlaylist', async function(req, res) {
         playlistName = "All Time Favorites";
     }
 
-    try
-    {
-        let playlist = await generatePlaylist(playlistName, description, user, access_token_from_db);
-        let success = await connection.query("insert into playlists (id, type, userName) values (\'" + playlist.id + "\',\'" + timePeriod + "\', \'" + user + "\')");
-
-        res.sendStatus(200);
-    }
-    catch(error)
-    {
-        res.sendStatus(400);
-    }
-});
-
-app.get('/deletePlaylist', async function(req, res) {
-
-    let timePeriod = req.query.timePeriod;
-    let user = req.query.user;
-
-    try
-    {
-        let results = await connection.query("Select access_token from users where name = '" + user + "\'");
-        let access_token_from_db = results[0].access_token;
-
-        let playlists = await connection.query("select id from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
-        let id = playlists[0].id;
-
-        let options = {
-            method: "DELETE",
-            headers: {
-              'Authorization': 'Bearer ' + access_token_from_db
-            }
-        }
-
-        let unfollowed = await fetch("https://api.spotify.com/v1/playlists/" + id + "/followers", options);
-
-        let db_results = await connection.query("delete from playlists where userName = '" + user + "\' and type = \'" + timePeriod + "\'");
-        let userPreference = await connection.query("update users set " + timePeriod + "=0");
-
-        res.sendStatus(200);
-    }
-    catch(error)
-    {
-        console.log(error);
-        res.sendStatus(400);
-    }
-});
-
-
-function generateRandomString(length)
-{
-    var text = '';
-    var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-    for (var i = 0; i < length; i++)
-    {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-
-    return text;
+    return playlistName;
 }
-
 
 async function getUserPreferences(userName)
 {
@@ -289,7 +315,6 @@ async function getUserPreferences(userName)
     };
 }
 
-
 async function generatePlaylist(name, description, userID, access_token_param)
 {
     let options = {
@@ -318,17 +343,15 @@ async function generatePlaylist(name, description, userID, access_token_param)
     }
 }
 
-/** Unused functions **/
+/******************************* Unused functions that may be used if more features are implemented *******************************/
 
 app.get('/clearData', async function(req, res)
 {
-    console.log("clear data");
     let userName = req.query.user;
 
     try
     {
         let deleted = await connection.query("delete from users where name = '" + userName + "\'");
-        console.log(deleted);
 
         res.sendStatus(200);
     }
@@ -358,8 +381,6 @@ app.get('/clearDataLoginFirst', function(req, res)
 
 app.get('/clearDataAfterLogin', async function(req, res)
 {
-    console.log("clear data after login");
-
     let access_token;
 
     // Requests the access_token and refresh_token from spotify
@@ -424,8 +445,6 @@ app.get('/clearDataAfterLogin', async function(req, res)
             }
         });
     });
-
-    console.log(userDeleted);
 
     // Send the user prefrences and the access_token to the browser
     res.redirect('/index.html?dataCleared=' + true);
