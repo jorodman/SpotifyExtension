@@ -124,25 +124,14 @@ async function checkForDeletedPlaylists(connection)
             }
         };
 
-        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
+        let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
+        let following = await response.json();
 
-        if(res.status === 404)
+        if(!following[0] || response.status === 404)
         {
-            console.log("Deleting playlist that doesn't exists: " + playlist.id);
+            console.log("Deleting playlist: " + playlist.id);
 
             let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-        }
-        else
-        {
-            let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
-            let following = await response.json();
-
-            if(!following[0])
-            {
-                console.log("Deleting playlist that user isn't following: " + playlist.id);
-
-                let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-            }
         }
     }
 }
@@ -154,13 +143,10 @@ async function updateAllPlaylists(connection)
 
     for(let user of users)
     {
+        let preferences = await getUserPreferences(user.name, connection);
         let tokenRequest = await getAccessToken(user.refresh_token);
-
         let access_token = tokenRequest.body.access_token;
 
-        let preferences = await getUserPreferences(user.name, connection);
-
-        // TODO: update to use the new database schema
         if(preferences.fourWeekPlaylist)
         {
             let queryResults = await connection.query("Select id from playlists where userName = \'" + user.name + "\' and type = 'fourWeekPlaylist'");
@@ -169,12 +155,6 @@ async function updateAllPlaylists(connection)
             if(playlistObj)
             {
                 let updated = await updatePlaylist("short_term", playlistObj.id, connection, access_token);
-
-                // let tracks = await getTopTracks("short_term", access_token, 100);
-                //
-                // // TODO maybe change this to a clear playlist function?
-                // let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistObj.id, access_token, []);
-                // let addSongsResult = await addTracksToPlaylist(playlistObj.id, access_token, tracks);
             }
         }
 
@@ -186,10 +166,6 @@ async function updateAllPlaylists(connection)
             if(playlistObj)
             {
                 let updated = await updatePlaylist("medium_term", playlistObj.id, connection, access_token);
-
-                // let tracks = await getTopTracks("medium_term", access_token, 200);
-                // let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistObj.id, access_token, []);
-                // let addSongsResult = await addTracksToPlaylist(playlistObj.id, access_token, tracks);
             }
         }
 
@@ -201,10 +177,6 @@ async function updateAllPlaylists(connection)
             if(playlistObj)
             {
                 let updated = await updatePlaylist("long_term", playlistObj.id, connection, access_token);
-
-                // let tracks = await getTopTracks("long_term", access_token, 200);
-                // let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistObj.id, access_token, []);
-                // let addSongsResult = await addTracksToPlaylist(playlistObj.id, access_token, tracks);
             }
         }
     }
@@ -234,18 +206,8 @@ async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
     };
 
     let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
-
-    if(res.status === 201)
-    {
-        console.log("Playlist cleared");
-    }
-    else
-    {
-        console.log("Error clearing playlist: " + res.status);
-    }
 }
 
-// ALLOWS DUPLICATES
 async function addTracksToPlaylist(playlistID, access_token_param, tracks)
 {
     let uris = [];
@@ -296,8 +258,6 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
         numTracks = 99;
     }
 
-    console.log("Getting top " + numTracks + " tracks");
-
     let options = {
         method: "GET",
         headers: {
@@ -313,7 +273,6 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
         let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=' + numTracks + '&offset=' + 0, options);
         let data = await res.json();
 
-        // Just in case it gets stuck in an infinite loop
         if(res.status === 200 && data.items.length > 0)
         {
             topUserTracks = topUserTracks.concat(data.items);
@@ -326,22 +285,15 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
             let tracksLeft = numTracks - tracksRecieved;
             let limit = (tracksLeft > 50) ? 49 : tracksLeft;
 
-            console.log("Tracks left: " + tracksLeft);
-            console.log("Limit:       " + limit);
-            console.log("offset:      " + tracksRecieved);
-
             let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=' + limit + '&offset=' + tracksRecieved, options);
-
             let data = await res.json();
 
-            // Just in case it gets stuck in an infinite loop
             if(res.status !== 200 || data.items.length === 0)
             {
                 break;
             }
 
             tracksRecieved += data.items.length;
-
             topUserTracks = topUserTracks.concat(data.items);
         }
     }
@@ -353,9 +305,16 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
 
 async function updatePlaylist(timePeriod, playlistID, connection, access_token)
 {
-    let tracks = await getTopTracks(timePeriod, access_token, 100);
-    let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistID, access_token, []);
-    let addSongsResult = await addTracksToPlaylist(playlistID, access_token, tracks);
+    try
+    {
+        let tracks = await getTopTracks(timePeriod, access_token, 100);
+        let clearPlaylistResult = await replaceAllSongsInPlaylist(playlistID, access_token, []);
+        let addSongsResult = await addTracksToPlaylist(playlistID, access_token, tracks);
+    }
+    catch(error)
+    {
+        console.log(error);
+    }
 }
 
 function timePeriodToSpotifyTerm(timePeriod)

@@ -19,6 +19,7 @@ class DatabaseClient
         console.log("Connected to database");
     }
 
+    // Can throw error
     query (sql)
     {
         return new Promise((resolve, reject) =>
@@ -27,11 +28,11 @@ class DatabaseClient
             {
                 if (err)
                 {
-                  reject(err);
+                    reject(err);
                 }
                 else
                 {
-                  resolve(results);
+                    resolve(results);
                 }
             });
         });

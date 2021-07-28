@@ -36,8 +36,14 @@ async function setupDatabaseConnection()
 
 app.get('/login', async function(req, res)
 {
-    // Whenever anyone tries to login, check to make sure that they havn't deleted any playlists that are still in the database
-    let deleted = await checkForDeletedPlaylists();
+    try
+    {
+        let deleted = await Common.checkForDeletedPlaylists();
+    }
+    catch(err)
+    {
+        console.log(err);
+    }
 
     var state = generateRandomString(16);
     res.cookie(Config.stateKey, state);
@@ -201,43 +207,43 @@ app.get('/deletePlaylist', async function(req, res) {
 
 /******************************* Helper functions *******************************/
 
-async function checkForDeletedPlaylists()
-{
-    let playlists = await connection.query("Select id, userName from playlists");
-
-    for(let playlist of playlists)
-    {
-        let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
-        let user = users[0];
-
-        let tokenRequest = await Common.getAccessToken(user.refresh_token);
-        let access_token = tokenRequest.body.access_token;
-
-        let options = {
-            method: "GET",
-            headers: {
-              'Authorization': 'Bearer ' + access_token
-            }
-        };
-
-        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
-
-        if(res.status === 404)
-        {
-            let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-        }
-        else
-        {
-            let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
-            let following = await response.json();
-
-            if(!following[0])
-            {
-                let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-            }
-        }
-    }
-}
+// async function checkForDeletedPlaylists()
+// {
+//     let playlists = await connection.query("Select id, userName from playlists");
+//
+//     for(let playlist of playlists)
+//     {
+//         let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
+//         let user = users[0];
+//
+//         let tokenRequest = await Common.getAccessToken(user.refresh_token);
+//         let access_token = tokenRequest.body.access_token;
+//
+//         let options = {
+//             method: "GET",
+//             headers: {
+//               'Authorization': 'Bearer ' + access_token
+//             }
+//         };
+//
+//         let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
+//
+//         if(res.status === 404)
+//         {
+//             let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
+//         }
+//         else
+//         {
+//             let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
+//             let following = await response.json();
+//
+//             if(!following[0])
+//             {
+//                 let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
+//             }
+//         }
+//     }
+// }
 
 function generateRandomString(length)
 {
