@@ -1,4 +1,6 @@
 
+/** This file holds functions that are used in both server.js and backgroundWorker.js **/
+
 var Config = require('./config.js');
 
 var fetch = require('node-fetch');
@@ -38,6 +40,7 @@ async function getUserPreferences(userName, connection)
     };
 }
 
+/* A promisified post request using the request framework */
 async function postRequest(options)
 {
     return new Promise(function (resolve, reject) {
@@ -60,6 +63,7 @@ async function postRequest(options)
     });
 }
 
+/* A promisified get request using the request framework */
 async function getRequest(options)
 {
     return new Promise(function (resolve, reject) {
@@ -82,6 +86,7 @@ async function getRequest(options)
     });
 }
 
+/* Gets an access_token from spotify using the refresh_token from the database */
 async function getAccessToken(refresh_token_param)
 {
     // let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
@@ -105,6 +110,7 @@ async function getAccessToken(refresh_token_param)
     return postRequest(authOptions);
 }
 
+/* Checks that users still follow the playlists saved in the database. If they don't deletes the playlists from the database */
 async function checkForDeletedPlaylists(connection)
 {
     let playlists = await connection.query("Select id, userName from playlists");
@@ -136,7 +142,7 @@ async function checkForDeletedPlaylists(connection)
     }
 }
 
-
+/* Updates all playlists in the database with the most recent songs from spotify */
 async function updateAllPlaylists(connection)
 {
     let users = await connection.query("Select * from users");
@@ -182,6 +188,7 @@ async function updateAllPlaylists(connection)
     }
 }
 
+/* Replaces all songs in the playlist with the ones given */
 async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
 {
     let uris = [];
@@ -208,6 +215,7 @@ async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
     let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
 }
 
+/* Adds the given tracks to the given playlist */
 async function addTracksToPlaylist(playlistID, access_token_param, tracks)
 {
     let uris = [];
@@ -250,6 +258,7 @@ async function addTracksToPlaylist(playlistID, access_token_param, tracks)
     }
 }
 
+/* Fetches and returns the top songs for a user given the time period. Due to spotify's limitations only the top 99 tracks can be fetched */
 async function getTopTracks(timePeriod, access_token_param, numTracks)
 {
     // HACK cause spotify won't let you get more than 99 top songs
@@ -303,6 +312,7 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
     return uniqueTracks;
 }
 
+/* Updates a given playlist with the most recent tracks */
 async function updatePlaylist(timePeriod, playlistID, connection, access_token)
 {
     try
@@ -317,6 +327,7 @@ async function updatePlaylist(timePeriod, playlistID, connection, access_token)
     }
 }
 
+/* Translates the database column name of a playlist to spotify's time period term */
 function timePeriodToSpotifyTerm(timePeriod)
 {
     let spotifyTerm;

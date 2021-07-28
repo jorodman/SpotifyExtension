@@ -1,4 +1,6 @@
 
+/* This program updates all playists in the database once per day */
+
 var DatabaseClient = require('./databaseClient.js');
 var Common = require('./common.js');
 var Config = require('./config.js');
@@ -27,6 +29,7 @@ async function run()
     }
 }
 
+/* Checks that users still follow playlists and then updates the playlists that are still followed */
 async function update()
 {
     let deleted = await Common.checkForDeletedPlaylists(connection);
@@ -65,7 +68,7 @@ async function getCurrentSongsInPlaylist(playlistID, access_token_param)
 }
 
 
-// This is what it would be if spotify would let developers get as many tracks as possible
+// This is what a top tracks function would be if spotify would let developers fetch as many tracks as they wanted
 async function getTopTracksInTheory(timePeriod, access_token_param, numTracks)
 {
     console.log("Getting top " + numTracks + " tracks");

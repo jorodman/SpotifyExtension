@@ -1,4 +1,6 @@
 
+/* This is the web server that serves the public directory to the browser and handles http requests */
+
 var DatabaseClient = require('./databaseClient.js');
 var Common = require('./common.js');
 var Config = require('./config.js');
@@ -66,7 +68,6 @@ app.get('/callback', async function(req, res)
     var state = req.query.state || null;
     var storedState = req.cookies ? req.cookies[Config.stateKey] : null;
 
-    // if (state === null || state !== storedState)
     if(state === null)
     {
         res.redirect('/#' +
@@ -206,44 +207,6 @@ app.get('/deletePlaylist', async function(req, res) {
 
 
 /******************************* Helper functions *******************************/
-
-// async function checkForDeletedPlaylists()
-// {
-//     let playlists = await connection.query("Select id, userName from playlists");
-//
-//     for(let playlist of playlists)
-//     {
-//         let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
-//         let user = users[0];
-//
-//         let tokenRequest = await Common.getAccessToken(user.refresh_token);
-//         let access_token = tokenRequest.body.access_token;
-//
-//         let options = {
-//             method: "GET",
-//             headers: {
-//               'Authorization': 'Bearer ' + access_token
-//             }
-//         };
-//
-//         let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
-//
-//         if(res.status === 404)
-//         {
-//             let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-//         }
-//         else
-//         {
-//             let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
-//             let following = await response.json();
-//
-//             if(!following[0])
-//             {
-//                 let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-//             }
-//         }
-//     }
-// }
 
 function generateRandomString(length)
 {

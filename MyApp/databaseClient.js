@@ -19,7 +19,7 @@ class DatabaseClient
         console.log("Connected to database");
     }
 
-    // Can throw error
+    // A promisified query so that callbacks don't have to be used
     query (sql)
     {
         return new Promise((resolve, reject) =>
@@ -38,6 +38,7 @@ class DatabaseClient
         });
     }
 
+    // Adds a user to the database
     async addUser(id, access_token, refresh_token)
     {
         try
