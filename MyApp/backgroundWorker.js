@@ -3,9 +3,7 @@ var DatabaseClient = require('./databaseClient.js');
 var Common = require('./common.js');
 var Config = require('./config.js');
 
-const fetch = require('node-fetch');
-var request = require('request');
-
+var fetch = require('node-fetch');
 var connection = new DatabaseClient();
 
 run();

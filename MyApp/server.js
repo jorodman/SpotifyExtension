@@ -4,10 +4,8 @@ var Common = require('./common.js');
 var Config = require('./config.js');
 
 var express = require('express');
-var request = require('request');
 var cors = require('cors');
 var fetch = require('node-fetch');
-var url = require('url');
 var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
@@ -17,7 +15,6 @@ app.use(express.static(__dirname + '/public'))
    .use(cors())
    .use(cookieParser()).listen(8888);
 
-// TODO update this with the IP of the actual database
 var connection = new DatabaseClient();
 
 setupDatabaseConnection();
@@ -288,118 +285,11 @@ async function generatePlaylist(name, description, userID, access_token_param)
     try
     {
         let res = await fetch('https://api.spotify.com/v1/users/' + userID + '/playlists', options);
-        let data = await res.json();
 
-        return data;
+        return await res.json();
     }
     catch(error)
     {
         throw new Error(error);
     }
 }
-
-/******************************* Unused functions that may be used if more features are implemented *******************************/
-
-app.get('/clearData', async function(req, res)
-{
-    let userName = req.query.user;
-
-    try
-    {
-        let deleted = await connection.query("delete from users where name = '" + userName + "\'");
-
-        res.sendStatus(200);
-    }
-    catch(error)
-    {
-        res.sendStatus(400);
-    }
-});
-
-app.get('/clearDataLoginFirst', function(req, res)
-{
-    var state = generateRandomString(16);
-    res.cookie(Config.stateKey, state);
-
-    // TODO: What authorization is needed as of now?
-    var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
-    res.redirect('https://accounts.spotify.com/authorize?' +
-        querystring.stringify({
-            response_type: 'code',
-            client_id: client_id,
-            scope: scope,
-            redirect_uri: 'http://localhost:8888/clearDataAfterLogin',
-            state: state,
-            show_dialog: true
-        }));
-});
-
-app.get('/clearDataAfterLogin', async function(req, res)
-{
-    let access_token;
-
-    // Requests the access_token and refresh_token from spotify
-    let tokenRequest = await new Promise(function (resolve, reject) {
-
-        let string = (client_id + ':' + client_secret).toString('base64');
-        let buffer = Buffer.from(string);
-
-        let options = {
-            url: 'https://accounts.spotify.com/api/token',
-            form: {
-                code: code,
-                redirect_uri: Config.redirect_uri,
-                grant_type: 'authorization_code'
-            },
-            headers: {
-                'Authorization': 'Basic ' + buffer
-            },
-            json: true
-        };
-
-        request.post(options, function(error, response, body)
-        {
-            if (!error && response.statusCode === 200)
-            {
-                access_token = body.access_token;
-                refresh_token = body.refresh_token;
-
-                resolve();
-            }
-            else
-            {
-                res.redirect('/#' +
-                querystring.stringify({
-                    error: 'invalid_token'
-                }));
-
-                reject();
-            }
-        });
-    });
-
-    // Requests the users info from spotify and adds to the database
-    let userDeleted = await new Promise(function (resolve, reject) {
-
-        let options = {
-          url: 'https://api.spotify.com/v1/me',
-          headers: { 'Authorization': 'Bearer ' + access_token },
-          json: true
-        };
-
-        request.get(options, async function(error, response, body) {
-            if(response.statusCode === 200)
-            {
-                let deleted = await connection.query("delete from users where name = '" + body.id + "\'");
-                resolve(deleted);
-            }
-            else
-            {
-                reject(response.statusCode);
-            }
-        });
-    });
-
-    // Send the user prefrences and the access_token to the browser
-    res.redirect('/index.html?dataCleared=' + true);
-});

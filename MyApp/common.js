@@ -1,5 +1,4 @@
 
-
 var Config = require('./config.js');
 
 var fetch = require('node-fetch');
