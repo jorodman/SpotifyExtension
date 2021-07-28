@@ -10,17 +10,18 @@ How to run this program:
 
 How it's designed:
 - The html page is a bootstrap Template
-- The front end was written by Joseph Rodman in javascript and is responsible for keeping track of the user that the webpage represents and which
+- The front end was written by Joseph Rodman in Javascript and is responsible for keeping track of the user that the webpage represents and which
 playlists the user has subscribed to. It makes http requests to the web server and does not make any calls to the Spotify API
 - The web server is written in express.js and communicates with the MySQL database. It makes calls to the Spotify API
+- The web server started as the code from an example program provided by Spotify but evolved into much more than that
 - The backgroundWorker.js program is written in vanilla node.js and communicates with the MySQL database and makes calls to the Spotify API
 
 Design Considerations:
-- For security purposes, all of the calls to the Spotify API are made in the backend, and the front end only ever knows the userID (aka username) of whoever is logged in
-- Server.js and backgroundWorker.js make a lot of similar calls to the spotify API so I created common.js so that I didn't have to copy and past functions between the two programs
+- For security purposes, all of the calls to the Spotify API are made in the backend, and the front end only ever knows the user ID (aka username) of whoever is logged in
+- Server.js and backgroundWorker.js make a lot of similar calls to the Spotify API so I created common.js so that I didn't have to copy and past functions between the two programs
 - I created databaseClient.js because I wanted to promisify the MySQL query function rather than using callbacks to help make the code more readable
 - I intentionally do not catch most errors because I want the program to shut down if something goes wrong
 
 
-Note: Spotify does not approve apps that are "hobbys" so I didn't apply to make this app official. This is really just to show employers that I can code
+Note: Spotify does not approve hobby apps so I didn't apply to make this app official. This is really just to show employers that I can code
 and to make some great playlists for me and a few friends
