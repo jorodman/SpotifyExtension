@@ -1,102 +1,50 @@
 
 var DatabaseClient = require('./databaseClient.js');
+var Common = require('./common.js');
+var Config = require('./config.js');
 
 const fetch = require('node-fetch');
 var request = require('request');
 
-var client_id = '68829692b36742b68cf3163a55138448'; // Your client id
-var client_secret = '761fc3a6e9054badb680d682b5dcd354'; // Your secret
-
 var connection = new DatabaseClient();
 
-setupDatabaseConnection();
+run();
+
+async function run()
+{
+    try
+    {
+        let db = await setupDatabaseConnection();
+    }
+    catch (e)
+    {
+        console.log(e);
+    }
+    finally
+    {
+        // Update playlists once per day
+        let updated = await update();
+
+        setTimeout(() => { update() }, 3600000 );
+    }
+}
+
+async function update()
+{
+    //let deleted = await Common.checkForDeletedPlaylists(connection);
+    let playlistsUpdated = await updateAllPlaylists();
+}
+
 
 async function setupDatabaseConnection()
 {
     try
     {
         let connected = await connection.connect();
-        let deleted = await checkForDeletedPlaylists();
-        let playlistsUpdated = await updateAllPlaylists();
     }
     catch(error)
     {
         console.log(error);
-    }
-    finally
-    {
-        //setTimeout(() => { updateAllPlaylists() }, 1000);
-    }
-}
-
-async function getUserPreferences(userName)
-{
-    let playlists = await connection.query("Select type from users natural join playlists where name = \'" + userName + "\'");
-
-    let fourWeekPlaylist = false;
-    let sixMonthPlaylist = false;
-    let allTimePlaylist = false;
-
-    if(playlists)
-    {
-        for(let playlist of playlists)
-        {
-            if(playlist.type === "fourWeekPlaylist")
-            {
-                fourWeekPlaylist = true;
-            }
-            else if(playlist.type === "sixMonthPlaylist")
-            {
-                sixMonthPlaylist = true;
-            }
-            else if(playlist.type === "allTimePlaylist")
-            {
-                allTimePlaylist = true;
-            }
-        }
-    }
-
-    return {
-        fourWeekPlaylist: fourWeekPlaylist,
-        sixMonthPlaylist: sixMonthPlaylist,
-        allTimePlaylist: allTimePlaylist
-    };
-}
-
-async function checkForDeletedPlaylists()
-{
-    let playlists = await connection.query("Select id, userName from playlists");
-
-    for(let playlist of playlists)
-    {
-        let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
-        let user = users[0];
-
-        let access_token = await getAccessToken(user.refresh_token);
-
-        let options = {
-            method: "GET",
-            headers: {
-              'Authorization': 'Bearer ' + access_token
-            }
-        };
-
-        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
-
-        if(res.status === 404)
-        {
-            let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-        }
-        else
-        {
-            let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
-            let following = await response.json();
-
-            if(!following[0])
-            {
-                let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
-            }
-        }
     }
 }
 
@@ -106,9 +54,10 @@ async function updateAllPlaylists()
 
     for(let user of users)
     {
-        let access_token = await getAccessToken(user.refresh_token);
+        let tokenRequest = await Common.getAccessToken(user.refresh_token);
+        let access_token = tokenRequest.body.access_token;
 
-        let preferences = await getUserPreferences(user.name);
+        let preferences = await Common.getUserPreferences(user.name, connection);
 
         // TODO: update to use the new database schema
         if(preferences.fourWeekPlaylist)
@@ -181,17 +130,9 @@ async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
 
     let res = await fetch('https://api.spotify.com/v1/playlists/' + playlistID + '/tracks', options);
 
-
     if(res.status === 201)
     {
         console.log("Playlist cleared");
-    }
-    else if(res.status === 404)
-    {
-        // The resource does not exist - delete from database?
-        // No because there is no harm is trying to update a non existent playlist but there could be a temporary issue with spotify that causes a 404
-        // and it would be bad to delete the playlist from the database in that case
-        // Maybe do some sort of iterative thing instead?
     }
     else
     {
@@ -234,9 +175,6 @@ async function addTracksToPlaylist(playlistID, access_token_param, tracks)
         {
             tracksAdded += 100;
             tracksLeft = uris.length;
-
-            let json = await res.json();
-            let snapshot = json.snapshot_id;
         }
         else
         {
@@ -244,35 +182,6 @@ async function addTracksToPlaylist(playlistID, access_token_param, tracks)
         }
     }
 }
-
-async function getAccessToken(refresh_token_param)
-{
-    var authOptions = {
-        url: 'https://accounts.spotify.com/api/token',
-        headers: { 'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64')) },
-        form: {
-            grant_type: 'refresh_token',
-            refresh_token: refresh_token_param
-        },
-        json: true
-    };
-
-    return new Promise(function(resolve, reject)
-    {
-        request.post(authOptions, function(error, response, body)
-        {
-            if (!error && response.statusCode === 200)
-            {
-                resolve(body.access_token);
-            }
-            else
-            {
-                reject("error");
-            }
-        })
-    });
-}
-
 
 async function getTopTracks(timePeriod, access_token_param, numTracks)
 {
@@ -319,13 +228,13 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
             let res = await fetch('https://api.spotify.com/v1/me/top/tracks?time_range=' + timePeriod + '&limit=' + limit + '&offset=' + tracksRecieved, options);
             let data = await res.json();
 
-            tracksRecieved += data.items.length;
-
             // Just in case it gets stuck in an infinite loop
             if(res.status !== 200 || data.items.length === 0)
             {
                 break;
             }
+
+            tracksRecieved += data.items.length;
 
             topUserTracks = topUserTracks.concat(data.items);
         }
@@ -337,7 +246,7 @@ async function getTopTracks(timePeriod, access_token_param, numTracks)
 }
 
 
-/* Unused functions */
+/******************************* Unused functions that may be used if more features are implemented *******************************/
 
 async function getCurrentSongsInPlaylist(playlistID, access_token_param)
 {

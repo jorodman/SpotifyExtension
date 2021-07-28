@@ -1,21 +1,15 @@
 
 var DatabaseClient = require('./databaseClient.js');
+var Common = require('./common.js');
+var Config = require('./config.js');
 
 var express = require('express');
 var request = require('request');
 var cors = require('cors');
-const fetch = require('node-fetch');
-const url = require('url');
-
+var fetch = require('node-fetch');
+var url = require('url');
 var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
-
-var client_id = '68829692b36742b68cf3163a55138448';
-var client_secret = '761fc3a6e9054badb680d682b5dcd354';
-
-// TODO update this to the URL that the site is hosted on
-var redirect_uri = 'http://localhost:8888/callback';
-var stateKey = 'spotify_auth_state';
 
 var app = express();
 
@@ -43,18 +37,21 @@ async function setupDatabaseConnection()
 
 /******************************* Handling Webpage Requests *******************************/
 
-app.get('/login', function(req, res)
+app.get('/login', async function(req, res)
 {
+    // Whenever anyone tries to login, check to make sure that they havn't deleted any playlists that are still in the database
+    //let deleted = await checkForDeletedPlaylists();
+
     var state = generateRandomString(16);
-    res.cookie(stateKey, state);
+    res.cookie(Config.stateKey, state);
 
     var scope = 'user-library-read user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private';
     res.redirect('https://accounts.spotify.com/authorize?' +
         querystring.stringify({
             response_type: 'code',
-            client_id: client_id,
+            client_id: Config.client_id,
             scope: scope,
-            redirect_uri: redirect_uri,
+            redirect_uri: Config.redirect_uri,
             state: state,
             show_dialog: true
         }));
@@ -64,7 +61,7 @@ app.get('/callback', async function(req, res)
 {
     var code = req.query.code || null;
     var state = req.query.state || null;
-    var storedState = req.cookies ? req.cookies[stateKey] : null;
+    var storedState = req.cookies ? req.cookies[Config.stateKey] : null;
 
     // if (state === null || state !== storedState)
     if(state === null)
@@ -76,28 +73,28 @@ app.get('/callback', async function(req, res)
     }
     else
     {
-        res.clearCookie(stateKey);
+        res.clearCookie(Config.stateKey);
 
         try
         {
-            let string = (client_id + ':' + client_secret).toString('base64');
+            let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
             let buffer = Buffer.from(string);
 
             let tokenOptions = {
                 url: 'https://accounts.spotify.com/api/token',
                 form: {
                     code: code,
-                    redirect_uri: redirect_uri,
+                    redirect_uri: Config.redirect_uri,
                     grant_type: 'authorization_code'
                 },
                 headers: {
-                    'Authorization': 'Basic ' + buffer
+                    'Authorization': 'Basic ' + (new Buffer(Config.client_id + ':' + Config.client_secret).toString('base64'))
                 },
                 json: true
             };
 
             // Requests the access_token and refresh_token from spotify
-            let tokenRequest = await postRequest(tokenOptions);
+            let tokenRequest = await Common.postRequest(tokenOptions);
 
             let access_token = tokenRequest.body.access_token;
             let refresh_token = tokenRequest.body.refresh_token;
@@ -108,10 +105,10 @@ app.get('/callback', async function(req, res)
               json: true
             };
 
-            let userResponse = await getRequest(getMeOptions);
+            let userResponse = await Common.getRequest(getMeOptions);
 
             let userAdded = await connection.addUser(userResponse.body.id, access_token, refresh_token);
-            let preferences = await getUserPreferences(userResponse.body.id);
+            let preferences = await Common.getUserPreferences(userResponse.body.id, connection);
 
             // Send the user prefrences and the user id to the browser
             res.redirect('/index.html?id=' + userResponse.body.id + "&fourWeekPlaylist=" + preferences.fourWeekPlaylist + "&sixMonthPlaylist=" + preferences.sixMonthPlaylist + "&allTimePlaylist=" + preferences.allTimePlaylist);
@@ -202,48 +199,42 @@ app.get('/deletePlaylist', async function(req, res) {
 
 /******************************* Helper functions *******************************/
 
-async function getRequest(options)
+async function checkForDeletedPlaylists()
 {
-    return new Promise(function (resolve, reject) {
+    let playlists = await connection.query("Select id, userName from playlists");
 
-        request.get(options, function(error, response, body) {
-            if(!error)
-            {
-                resolve({
-                    response: response,
-                    body: body
-                });
-            }
-            else
-            {
-                reject({
-                    error: error
-                });
-            }
-        });
-    });
-}
+    for(let playlist of playlists)
+    {
+        let users = await connection.query("Select refresh_token, name from users where name = \'" + playlist.userName + "\'");
+        let user = users[0];
 
-async function postRequest(options)
-{
-    return new Promise(function (resolve, reject) {
+        let tokenRequest = await Common.getAccessToken(user.refresh_token);
+        let access_token = tokenRequest.body.access_token;
 
-        request.post(options, function(error, response, body) {
-            if(!error)
-            {
-                resolve({
-                    response: response,
-                    body: body
-                });
+        let options = {
+            method: "GET",
+            headers: {
+              'Authorization': 'Bearer ' + access_token
             }
-            else
+        };
+
+        let res = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id, options);
+
+        if(res.status === 404)
+        {
+            let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
+        }
+        else
+        {
+            let response = await fetch('https://api.spotify.com/v1/playlists/' + playlist.id + '/followers/contains?ids=' + user.name, options);
+            let following = await response.json();
+
+            if(!following[0])
             {
-                reject({
-                    error: error
-                });
+                let deleted = await connection.query("delete from playlists where id = '" + playlist.id + "\'");
             }
-        });
-    });
+        }
+    }
 }
 
 function generateRandomString(length)
@@ -277,40 +268,6 @@ function getPlaylistNameFromTimePeriod(timePeriod)
     }
 
     return playlistName;
-}
-
-async function getUserPreferences(userName)
-{
-    let playlists = await connection.query("Select type from users natural join playlists where name = \'" + userName + "\'");
-
-    let fourWeekPlaylist = 0;
-    let sixMonthPlaylist = 0;
-    let allTimePlaylist = 0;
-
-    if(playlists)
-    {
-        for(let playlist of playlists)
-        {
-            if(playlist.type === "fourWeekPlaylist")
-            {
-                fourWeekPlaylist = 1;
-            }
-            else if(playlist.type === "sixMonthPlaylist")
-            {
-                sixMonthPlaylist = 1;
-            }
-            else if(playlist.type === "allTimePlaylist")
-            {
-                allTimePlaylist = 1;
-            }
-        }
-    }
-
-    return {
-        fourWeekPlaylist: fourWeekPlaylist,
-        sixMonthPlaylist: sixMonthPlaylist,
-        allTimePlaylist: allTimePlaylist
-    };
 }
 
 async function generatePlaylist(name, description, userID, access_token_param)
@@ -362,7 +319,7 @@ app.get('/clearData', async function(req, res)
 app.get('/clearDataLoginFirst', function(req, res)
 {
     var state = generateRandomString(16);
-    res.cookie(stateKey, state);
+    res.cookie(Config.stateKey, state);
 
     // TODO: What authorization is needed as of now?
     var scope = 'user-library-read user-read-private user-read-email playlist-read-private user-follow-modify user-follow-read playlist-modify-public playlist-modify-private user-top-read';
@@ -391,7 +348,7 @@ app.get('/clearDataAfterLogin', async function(req, res)
             url: 'https://accounts.spotify.com/api/token',
             form: {
                 code: code,
-                redirect_uri: redirect_uri,
+                redirect_uri: Config.redirect_uri,
                 grant_type: 'authorization_code'
             },
             headers: {
