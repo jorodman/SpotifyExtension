@@ -74,8 +74,10 @@ app.get('/callback', async function(req, res)
 
         try
         {
-            let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
-            let buffer = Buffer.from(string);
+            // let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
+            // let buffer = Buffer.from(string);
+
+            let buffer = (new Buffer(Config.client_id + ':' + Config.client_secret).toString('base64'));
 
             let tokenOptions = {
                 url: 'https://accounts.spotify.com/api/token',
@@ -85,7 +87,7 @@ app.get('/callback', async function(req, res)
                     grant_type: 'authorization_code'
                 },
                 headers: {
-                    'Authorization': 'Basic ' + (new Buffer(Config.client_id + ':' + Config.client_secret).toString('base64'))
+                    'Authorization': 'Basic ' + buffer
                 },
                 json: true
             };

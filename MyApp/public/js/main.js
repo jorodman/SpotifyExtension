@@ -4,7 +4,6 @@ window.onload = async function()
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
 
-    // Get info from the URL
     const userID = urlParams.get('id');
     const fourWeekPlaylist = urlParams.get("fourWeekPlaylist");
     const sixMonthPlaylist = urlParams.get("sixMonthPlaylist");

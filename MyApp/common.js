@@ -84,8 +84,10 @@ async function getRequest(options)
 
 async function getAccessToken(refresh_token_param)
 {
-    let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
-    let buffer = Buffer.from(string);
+    // let string = (Config.client_id + ':' + Config.client_secret).toString('base64');
+    // let buffer = Buffer.from(string);
+
+    let buffer = (new Buffer(Config.client_id + ':' + Config.client_secret).toString('base64'));
 
     var authOptions =
     {

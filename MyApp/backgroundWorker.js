@@ -53,6 +53,7 @@ async function updateAllPlaylists()
     for(let user of users)
     {
         let tokenRequest = await Common.getAccessToken(user.refresh_token);
+
         let access_token = tokenRequest.body.access_token;
 
         let preferences = await Common.getUserPreferences(user.name, connection);
@@ -103,8 +104,6 @@ async function updateAllPlaylists()
 
 async function replaceAllSongsInPlaylist(playlistID, access_token_param, tracks)
 {
-    console.log("Clearing playlist " + playlistID);
-
     let uris = [];
 
     for(let track of tracks)
