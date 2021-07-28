@@ -37,12 +37,12 @@ async function setupDatabaseConnection()
 app.get('/login', async function(req, res)
 {
     // Whenever anyone tries to login, check to make sure that they havn't deleted any playlists that are still in the database
-    //let deleted = await checkForDeletedPlaylists();
+    let deleted = await checkForDeletedPlaylists();
 
     var state = generateRandomString(16);
     res.cookie(Config.stateKey, state);
 
-    var scope = 'user-library-read user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private';
+    var scope = 'user-library-read user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private user-top-read';
     res.redirect('https://accounts.spotify.com/authorize?' +
         querystring.stringify({
             response_type: 'code',
@@ -140,6 +140,9 @@ app.get('/generatePlaylist', async function(req, res) {
 
             let playlist = await generatePlaylist(playlistName, playlistDescription, user, access_token_from_db);
             let success = await connection.query("insert into playlists (id, type, userName) values (\'" + playlist.id + "\',\'" + timePeriod + "\', \'" + user + "\')");
+
+            let term = Common.timePeriodToSpotifyTerm(timePeriod);
+            let updated = Common.updatePlaylist(term, playlist.id, connection, access_token_from_db);
 
             res.sendStatus(200);
         }
