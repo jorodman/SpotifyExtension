@@ -1,9 +1,11 @@
+Note: Spotify does not approve hobby apps so I didn't apply to make this app official, which is why I never ended up hosting it online. This is really just to show employers that I can code and to I used it to make some great playlists for me and a few friends. At this point my Spotify Developer License has expired and so it can't actually access the spotify API anymore. I've also taken down the EC2 that I used to host the database.
+
 What this app does:
 - This app allows Spotify premium users to select anywhere from 1 to 3 time periods (4 week, 6 month, and all time) and have playlists of their top songs from those periods generated
 - It allows them to delete the playlists through the webpage
 - It updates the playlists daily as new information is fetched from the Spotify API
 
-How to run this program:
+How to run this program (see note about on why this won't actually work anymore):
 - cd into MyApp and run "node server.js". This will start the web server, which serves the /public directory to the browser on port 8888
 - cd into MyApp and run "node backgroundWorker.js". This will start the program that updates all playlists daily
 
@@ -21,4 +23,4 @@ Design Considerations:
 - I intentionally do not catch most errors because I want the program to shut down if something goes wrong
 
 
-Note: Spotify does not approve hobby apps so I didn't apply to make this app official. This is really just to show employers that I can code and to make some great playlists for me and a few friends
+
